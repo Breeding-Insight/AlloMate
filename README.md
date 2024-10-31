@@ -20,7 +20,7 @@ shiny::runGitHub("AlloMate", "BreedingInisght")
 ##### EBVs
 One tab-separated file per trait, 2 colummns "ID and EBV"
 
-###Output file
+### Output file
 Excel file with two tabs. 
 First tab shows a table with all possible male and female combinations regardless of any filters applied. 
 Second tab shows a matrix with females in rows and males in columns, crosses with kinship coefficients larger than theshold or negative EBVs will be blank.
