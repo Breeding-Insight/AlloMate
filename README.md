@@ -8,7 +8,7 @@ This shiny app allows breeders to combine several traits (current version suppor
 ### To run the app:  
 install.packages("shiny") #If not already installed   
 library(shiny)  
-shiny::runGitHub("AlloMate", "BreedingInisght")
+runGitHub(repo = "Breeding-Insight/AlloMate", subdir = "app")
 
 ### Input files
 ##### Pedigree
