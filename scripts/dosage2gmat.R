@@ -1,18 +1,17 @@
+library(dplyr)
+
+mat = read.table("data/test_snp_matrix.txt", header = TRUE, row.names = 1, stringsAsFactors = FALSE, na.strings = "-")
+ploidy = 2
+
 compute_relationship_matrix <- function(mat,
-                                        ploidy,
-                                        method = "VanRaden",
-                                        impute = TRUE) {
+                                        ploidy) {
   ### Prepare matrix
   #Remove any SNPs that are all NAs
   mat <- mat[, colSums(is.na(mat)) < nrow(mat)]
   #impute the missing values with the mean of the column
-  if (impute) {
     mat <- data.frame(mat, check.names = FALSE, check.rows = FALSE) %>%
       mutate_all(~ifelse(is.na(.x), mean(.x, na.rm = TRUE), .x)) %>%
       as.matrix()
-  }
-  
-  if (method == "VanRaden") {
     # Calculate the additive relationship matrix using VanRaden's method
     
     #Calculate allele frequencies
@@ -26,9 +25,11 @@ compute_relationship_matrix <- function(mat,
     Z <- scale(mat, center = TRUE, scale = FALSE)
     ZZ <- (Z %*% t(Z))
     #Calculate the additive relationship matrix
-    A.mat <- ZZ / denominator
+    A.mat <- round(ZZ / denominator,9) 
     
     return(A.mat)
-    
-  } 
 }
+
+amat = compute_relationship_matrix(mat, ploidy = 2)
+
+

@@ -2,5 +2,5 @@
 .Rhistory
 .RData
 .Ruserdata
-.data/imputed_sw_og_fullped.geno
+.data/test_snp_matrix.txt.geno
 .scripts
