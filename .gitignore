@@ -2,3 +2,5 @@
 .Rhistory
 .RData
 .Ruserdata
+.data/imputed_sw_og_fullped.geno
+.scripts
