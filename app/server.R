@@ -8,7 +8,7 @@ library(DT)
 library(tibble)
 library(openxlsx)
 
-# --- Helper functions ---
+#### Helper Functions ####
 
 read_candidates <- function(file) {
   df <- readr::read_table(file$datapath)
@@ -109,7 +109,7 @@ process_ebvs <- function(trait_counter, input) {
   }
 }
 
-# --- Shiny Server Function ---
+#### Server Function ####
 
 server <- function(input, output, session) {
   
