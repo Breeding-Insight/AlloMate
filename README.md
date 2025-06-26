@@ -1,5 +1,9 @@
 # AlloMate
 
+![Version](https://img.shields.io/badge/version-1.1-blue.svg)
+![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)
+![Status](https://img.shields.io/badge/development-active-brightgreen.svg)
+
 <img src="app/www/allomate.png" alt="AlloMate Logo" width="200"/>
 
 AlloMate is a shiny app that simplifies mate allocation decisions for breeders.
@@ -8,6 +12,26 @@ AlloMate is a shiny app that simplifies mate allocation decisions for breeders.
 This shiny app allows breeders to combine multiple traits in a selection index and assign a relative weight to each trait. AlloMate also allows to simplify mate allocation by filtering out possible crosses with negative ebvs and by using a kinship threshold between parents set by the user.
 Current version calculates kinship through pedigree information only, we are working on supporting genotypic information using an Optimal Contribution Selection (OCS) framework in the near future.
 
+## Dependencies
+
+This app requires the following R packages:
+
+- **shiny**: For building the interactive web app interface  
+- **DT**: For rendering interactive data tables  
+- **shinyjs**: For additional Shiny JavaScript utilities  
+- **readxl**: For reading Excel files (if needed)  
+- **openxlsx**: For writing Excel output files  
+- **dplyr**: For data manipulation  
+- **tidyr**: For data tidying  
+- **readr**: For reading tab-separated files  
+- **purrr**: For functional programming helpers  
+- **kinship2**: For pedigree and kinship calculations  
+- **tibble**: For enhanced data frames  
+
+You can install any missing packages with:
+
+```r
+install.packages(c("shiny", "DT", "shinyjs", "readxl", "openxlsx", "dplyr", "tidyr", "readr", "purrr", "kinship2", "tibble"))
 ## Usage
 
 ### To run the app:
@@ -21,7 +45,6 @@ if (any(!installed)) install.packages(packages[!installed])
 # Run the app from GitHub
 shiny::runGitHub("Breeding-Insight/AlloMate", subdir = "app")
 ```
-
 ### Input files
 ##### Pedigree
 3 column tab separated file with with headers id, sire and dam in any order.
@@ -47,5 +70,4 @@ Proper preprocessing ensures that the selection index and filtering steps in the
 
 ### Citation:  
 Chinchilla-Vargas, Josue, Arlyn J. Ackerman, and Alexander M. Sandercock. 2025.  
-“AlloMate: Mate Allocation App for Breeders.” https://github.com/Breeding-Insight/AlloMate **RRID: SCR_027115**
-
+“AlloMate: Mate Allocation App for Breeders.” https://github.com/Breeding-Insight/AlloMate RRID: SCR_027115
