@@ -1,3 +1,4 @@
+<img src="app/www/allomate.png" alt="AlloMate Logo" width="200"/>
 # AlloMate
 AlloMate is a shiny app that simplifies mate allocation decisions for breeders.
   
