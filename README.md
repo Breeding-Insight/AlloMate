@@ -47,5 +47,5 @@ Proper preprocessing ensures that the selection index and filtering steps in the
 
 ### Citation:  
 Chinchilla-Vargas, Josue, Arlyn J. Ackerman, and Alexander M. Sandercock. 2025.  
-“AlloMate: Mate Allocation App for Breeders.” https://github.com/Breeding-Insight/AlloMate **RRID: Pending**
+“AlloMate: Mate Allocation App for Breeders.” https://github.com/Breeding-Insight/AlloMate **RRID: SCR_027115**
 
