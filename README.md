@@ -9,10 +9,18 @@ This shiny app allows breeders to combine multiple traits in a selection index a
 Current version calculates kinship through pedigree information only, we are working on supporting genotypic information using an Optimal Contribution Selection (OCS) framework in the near future.
 
 ## Usage
-### To run the app:  
-install.packages("shiny") #If not already installed  
-library(shiny)  
-runGitHub(repo = "Breeding-Insight/AlloMate", subdir = "app")
+
+### To run the app:
+
+```r
+# Install required packages if not already installed
+packages <- c("shiny", "DT", "shinyjs", "readxl", "openxlsx", "dplyr", "tidyr")
+installed <- packages %in% rownames(installed.packages())
+if (any(!installed)) install.packages(packages[!installed])
+
+# Run the app from GitHub
+shiny::runGitHub("Breeding-Insight/AlloMate", subdir = "app")
+```
 
 ### Input files
 ##### Pedigree
