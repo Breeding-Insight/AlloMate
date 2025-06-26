@@ -6,7 +6,7 @@ AlloMate is a shiny app that simplifies mate allocation decisions for breeders.
   
 ## Overview
 This shiny app allows breeders to combine multiple traits in a selection index and assign a relative weight to each trait. AlloMate also allows to simplify mate allocation by filtering out possible crosses with negative ebvs and by using a kinship threshold between parents set by the user.
-
+Current version calculates kinship through pedigree information only, we are working on supporting genotypic information using an Optimal Contribution Selection (OCS) framework in the near future.
 ## Usage
 ### To run the app:  
 install.packages("shiny") #If not already installed   
