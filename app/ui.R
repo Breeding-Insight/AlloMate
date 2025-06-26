@@ -13,7 +13,7 @@ ui <- function(request) {
       # AlloMate hex (right)
       tags$img(
         src = "allomate.png",
-        height = "120px",
+        height = "200px",
         style = "margin-left: 20px;"
       ),
       
