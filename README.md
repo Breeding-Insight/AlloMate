@@ -2,10 +2,6 @@
 
 <img src="app/www/allomate.png" alt="AlloMate Logo" width="200"/>
 
-**Citation:**  
-Chinchilla-Vargas, Josue, Arlyn J. Ackerman, and Alexander M. Sandercock. 2025.  
-“AlloMate: Mate Allocation App for Breeders.” https://github.com/Breeding-Insight/AlloMate :dancers:
-
 AlloMate is a shiny app that simplifies mate allocation decisions for breeders.
   
 ## Overview
@@ -40,3 +36,8 @@ Before uploading, ensure that **EBVs are pre-processed**:
 - **Transformed to a positive scale**, so that higher values represent better individuals  
 
 Proper preprocessing ensures that the selection index and filtering steps in the app function as intended.
+
+### Citation:  
+Chinchilla-Vargas, Josue, Arlyn J. Ackerman, and Alexander M. Sandercock. 2025.  
+“AlloMate: Mate Allocation App for Breeders.” https://github.com/Breeding-Insight/AlloMate **RRID: Pending**
+
