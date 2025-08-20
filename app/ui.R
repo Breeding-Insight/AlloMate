@@ -136,6 +136,87 @@ ui <- function(request) {
         .help-content {
           scroll-behavior: smooth;
         }
+        
+        .r-code-content h1 {
+          color: #2c3e50;
+          border-bottom: 3px solid #3498db;
+          padding-bottom: 10px;
+          margin-top: 30px;
+          margin-bottom: 20px;
+        }
+        
+        .r-code-content h2 {
+          color: #34495e;
+          border-left: 4px solid #3498db;
+          padding-left: 15px;
+          margin-top: 25px;
+          margin-bottom: 15px;
+        }
+        
+        .r-code-content h3 {
+          color: #2c3e50;
+          margin-top: 20px;
+          margin-bottom: 10px;
+        }
+        
+        .r-code-content .code-section {
+          background-color: #f8f9fa;
+          border: 1px solid #dee2e6;
+          border-radius: 8px;
+          padding: 20px;
+          margin: 15px 0;
+        }
+        
+        .r-code-content .code-section h4 {
+          color: #495057;
+          margin-top: 0;
+          margin-bottom: 15px;
+          border-bottom: 1px solid #dee2e6;
+          padding-bottom: 8px;
+        }
+        
+        .r-code-content pre {
+          background-color: #2c3e50;
+          color: #ecf0f1;
+          padding: 15px;
+          border-radius: 5px;
+          overflow-x: auto;
+          margin: 10px 0;
+          font-size: 12px;
+          line-height: 1.4;
+        }
+        
+        .r-code-content pre code {
+          background-color: transparent;
+          color: inherit;
+          padding: 0;
+        }
+        
+        .r-code-content .file-info {
+          background-color: #e3f2fd;
+          border: 1px solid #2196f3;
+          padding: 10px;
+          border-radius: 5px;
+          margin-bottom: 15px;
+          font-size: 12px;
+        }
+        
+        .r-code-content .setup-instructions {
+          background-color: #fff3cd;
+          border: 1px solid #ffeaa7;
+          padding: 15px;
+          border-radius: 5px;
+          margin: 20px 0;
+        }
+        
+        .r-code-content .setup-instructions h4 {
+          color: #856404;
+          margin-top: 0;
+        }
+        
+        .r-code-content .setup-instructions ul {
+          margin-bottom: 0;
+        }
       "))
     ),
     
@@ -252,7 +333,9 @@ ui <- function(request) {
           h4("📊 Export Results", style = "color: #155724; margin-bottom: 15px; border-bottom: 1px solid #c3e6cb; padding-bottom: 8px;"),
           p("Download all results in a single Excel file with multiple tabs:", style = "color: #6c757d; font-size: 12px; margin-bottom: 15px;"),
           downloadButton("download_all_results", "📥 Export All Results", 
-                         style = "width: 100%; background-color: #28a745; color: white; border: none; padding: 10px; border-radius: 5px;")
+                         style = "width: 100%; background-color: #28a745; color: white; border: none; padding: 10px; border-radius: 5px; margin-bottom: 10px;"),
+          actionButton("view_r_code_btn", "📝 View R Code", 
+                       style = "width: 100%; background-color: #17a2b8; color: white; border: none; padding: 10px; border-radius: 5px;")
         )
       ),
       mainPanel(
@@ -270,6 +353,28 @@ ui <- function(request) {
                    DTOutput("ocs_candidate_table"),
                    br(),
                    DTOutput("ocs_mating_table")
+          ),
+          tabPanel("R Code",
+                   div(
+                     style = "padding: 20px; background-color: #f8f9fa; border-radius: 8px; margin: 10px 0; max-height: 80vh; overflow-y: auto; position: relative;",
+                     div(
+                       style = "background-color: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);",
+                       div(
+                         style = "text-align: center; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid #007bff;",
+                         h2("📝 R Code Implementation", style = "color: #007bff; margin-bottom: 10px;"),
+                         p("Complete R code for implementing AlloMate analysis independently", style = "color: #666; font-size: 16px;")
+                       ),
+                       div(
+                         style = "text-align: center; margin-bottom: 20px;",
+                         downloadButton("download_r_code", "📥 Download Complete R Script", 
+                                       style = "background-color: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 5px; font-size: 14px;")
+                       ),
+                       div(
+                         style = "line-height: 1.6; font-size: 14px;",
+                         htmlOutput("r_code_content")
+                       )
+                     )
+                   )
           ),
           tabPanel("Help",
                    div(
