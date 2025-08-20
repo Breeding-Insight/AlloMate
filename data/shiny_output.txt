@@ -1,0 +1,266 @@
+> Downloading webR package: stringi
+Downloading webR package: zip
+Downloading webR package: openxlsx
+Warning in webr::install(pkg_name) :
+  Requested package quadprog not found in webR binary repo.
+Downloading webR package: clipr
+Downloading webR package: pkgconfig
+Downloading webR package: vctrs
+Downloading webR package: hms
+Downloading webR package: utf8
+Downloading webR package: pillar
+Downloading webR package: tibble
+Downloading webR package: bit
+Downloading webR package: bit64
+Downloading webR package: tidyselect
+Downloading webR package: tzdb
+Downloading webR package: vroom
+Downloading webR package: readr
+Downloading webR package: lattice
+Downloading webR package: Matrix
+Warning in install(dep, repos, info, lib, quiet, mount) :
+  Requested package quadprog not found in webR binary repo.
+Downloading webR package: evaluate
+Downloading webR package: xfun
+Downloading webR package: highr
+Downloading webR package: yaml
+Downloading webR package: knitr
+Downloading webR package: kinship2
+Downloading webR package: purrr
+Warning in webr::install(pkg_name) :
+  Requested package optiSel not found in webR binary repo.
+Downloading webR package: backports
+Downloading webR package: generics
+Downloading webR package: dplyr
+Downloading webR package: stringr
+Downloading webR package: tidyr
+Downloading webR package: broom
+Downloading webR package: conflicted
+Downloading webR package: blob
+Downloading webR package: DBI
+Downloading webR package: dbplyr
+Downloading webR package: data.table
+Downloading webR package: dtplyr
+Downloading webR package: forcats
+Downloading webR package: gtable
+Downloading webR package: isoband
+Downloading webR package: MASS
+Downloading webR package: nlme
+Downloading webR package: mgcv
+Downloading webR package: farver
+Downloading webR package: labeling
+Downloading webR package: RColorBrewer
+Downloading webR package: viridisLite
+Downloading webR package: scales
+Downloading webR package: ggplot2
+Downloading webR package: curl
+Downloading webR package: sys
+Downloading webR package: askpass
+Downloading webR package: openssl
+Downloading webR package: httr
+Downloading webR package: gargle
+Downloading webR package: uuid
+Downloading webR package: googledrive
+Downloading webR package: rematch
+Downloading webR package: cellranger
+Downloading webR package: ids
+Downloading webR package: rematch2
+Downloading webR package: googlesheets4
+Downloading webR package: haven
+Downloading webR package: timechange
+Downloading webR package: lubridate
+Downloading webR package: modelr
+Downloading webR package: systemfonts
+Downloading webR package: textshaping
+Downloading webR package: ragg
+Downloading webR package: readxl
+Downloading webR package: ps
+Downloading webR package: processx
+Downloading webR package: callr
+Downloading webR package: tinytex
+Downloading webR package: rmarkdown
+Downloading webR package: rstudioapi
+Downloading webR package: reprex
+Downloading webR package: selectr
+Downloading webR package: xml2
+Downloading webR package: rvest
+Downloading webR package: tidyverse
+Downloading webR package: htmlwidgets
+Downloading webR package: lazyeval
+Downloading webR package: crosstalk
+Downloading webR package: DT
+Downloading webR package: shinyjs
+Warning in webr::install(package) :
+  Requested package quadprog not found in webR binary repo.
+Warning in value[[3L]](cond) :
+  Package quadprog not available (will use fallback optimization): invalid argument type
+Warning: unable to access index for repository https://cran.rstudio.com/bin/emscripten/contrib/4.5:
+  download from 'https://cran.rstudio.com/bin/emscripten/contrib/4.5/PACKAGES' failed
+Warning in value[[3L]](cond) :
+  Package kinship2 not available (will use fallback): package ‘quadprog’ required by ‘kinship2’ could not be found
+Warning in webr::install(package) :
+  Requested package pkg not found in webR binary repo.
+✅ Loaded package: shiny
+Warning in webr::install(package) :
+  Requested package pkg not found in webR binary repo.
+✅ Loaded package: shinyjs
+Warning in webr::install(package) :
+  Requested package pkg not found in webR binary repo.
+✅ Loaded package: DT
+Warning in webr::install(package) :
+  Requested package pkg not found in webR binary repo.
+✅ Loaded package: openxlsx
+── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+✔ dplyr     1.1.4     ✔ readr     2.1.5
+✔ forcats   1.0.0     ✔ stringr   1.5.1
+✔ ggplot2   3.5.2     ✔ tibble    3.3.0
+✔ lubridate 1.9.4     ✔ tidyr     1.3.1
+✔ purrr     1.1.0     
+── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+✖ tidyr::expand() masks Matrix::expand()
+✖ dplyr::filter() masks stats::filter()
+✖ dplyr::lag()    masks stats::lag()
+✖ tidyr::pack()   masks Matrix::pack()
+✖ tidyr::unpack() masks Matrix::unpack()
+ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+✅ Loaded tidyverse package
+Warning in webr::install(package) :
+  Requested package optiSel not found in webR binary repo.
+⚠️ optiSel not available - loading custom OCS fallback
+✅ Custom OCS fallback loaded successfully
+📦 OCS functionality enabled via custom fallback
+🚀 AlloMate app startup complete!
+
+Attaching package: ‘shinyjs’
+
+The following object is masked from ‘package:lubridate’:
+
+    show
+
+The following object is masked from ‘package:Matrix’:
+
+    show
+
+The following object is masked from ‘package:shiny’:
+
+    runExample
+
+The following objects are masked from ‘package:methods’:
+
+    removeClass, show
+
+
+Attaching package: ‘DT’
+
+The following objects are masked from ‘package:shiny’:
+
+    dataTableOutput, renderDataTable
+
+
+── Column specification ────────────────────────────────────────────────────────
+cols(
+  id = col_character(),
+  sex = col_character()
+)
+
+
+── Column specification ────────────────────────────────────────────────────────
+cols(
+  id = col_character(),
+  dam = col_character(),
+  sire = col_character()
+)
+
+
+── Column specification ────────────────────────────────────────────────────────
+cols(
+  id = col_character(),
+  sex = col_character()
+)
+
+Warning: Error in %*%: requires numeric/complex matrix/vector arguments
+  43: as.vector
+  42: observe [/home/web_user/app_u8rewn08gib6axub2p0w/server.R#330]
+  41: <observer>
+  39: contextFunc
+  38: env$runWith
+  27: ctx$run
+  26: run
+  15: flushCallback
+  14: FUN
+  13: lapply
+  12: ctx$executeFlushCallbacks
+  11: .getReactiveEnvironment()$flush
+  10: shiny:::flushReact
+   9: .shiny_tick [<text>#51]
+   8: eval [<text>#1]
+   7: eval
+   6: efun
+   1: <Anonymous>
+Error: argument "msg" is missing, with no default
+
+── Column specification ────────────────────────────────────────────────────────
+cols(
+  id = col_character(),
+  sex = col_character()
+)
+
+
+── Column specification ────────────────────────────────────────────────────────
+cols(
+  ID = col_character(),
+  EBV = col_double()
+)
+
+Warning: Error in mutate: ℹ In argument: `across(starts_with("EBV."), ~replace_na(.x, 0))`.
+Caused by error in `across()`:
+! Can't compute column `EBV.1`.
+Caused by error in `vec_assign()`:
+! Can't convert `replace` <double> to match type of `data` <character>.
+  76: <Anonymous>
+  75: signalCondition
+  74: signal_abort
+  73: abort
+  72: <Anonymous>
+  71: signalCondition
+  70: signal_abort
+  69: abort
+  68: <Anonymous>
+  67: signalCondition
+  66: signal_abort
+  65: abort
+  64: stop_vctrs
+  63: stop_incompatible
+  62: stop_incompatible_type
+  61: stop_incompatible_cast
+  57: vec_default_cast
+  56: <Anonymous>
+  55: vec_assign
+  54: replace_na.default
+  53: replace_na
+  52: eval
+  51: mask$eval_all_mutate
+  49: mutate_col
+  47: mutate_cols
+  46: mutate.data.frame
+  45: mutate
+  44: %>%
+  43: process_ebvs [/home/web_user/app_u8rewn08gib6axub2p0w/R/utils.R#128]
+  42: observe [/home/web_user/app_u8rewn08gib6axub2p0w/server.R#322]
+  41: <observer>
+  39: contextFunc
+  38: env$runWith
+  27: ctx$run
+  26: run
+  15: flushCallback
+  14: FUN
+  13: lapply
+  12: ctx$executeFlushCallbacks
+  11: .getReactiveEnvironment()$flush
+  10: shiny:::flushReact
+   9: .shiny_tick [<text>#51]
+   8: eval [<text>#1]
+   7: eval
+   6: efun
+   1: <Anonymous>
+Error: argument "msg" is missing, with no default
