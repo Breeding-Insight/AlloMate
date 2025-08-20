@@ -31,7 +31,8 @@ AlloMate/
 │   │   ├── utils.R       # Data processing and utility functions
 │   │   ├── ocs_helpers.R # OCS analysis functions
 │   │   ├── ui_helpers.R  # UI helper functions
-│   │   └── load_functions.R # Function loader
+│   │   ├── load_functions.R # Function loader
+│   │   └── optsel_fallback.R # Custom OCS fallback implementation
 │   └── www/              # Static resources
 │       ├── allomate.png
 │       └── logos.png
@@ -39,12 +40,16 @@ AlloMate/
 │   ├── optsel_fallback.R # Custom OCS fallback implementation
 │   ├── validate_ocs_logic.R # OCS logic validation
 │   ├── compare_ocs_results.R # Results comparison
-│   └── ...               # Other utility scripts
+│   ├── ped_ocs_app.R     # Pedigree OCS application
+│   ├── dosage2gmat.R     # Dosage to genotype matrix conversion
+│   └── test.r            # Testing utilities
 ├── data/                 # Sample data files
 │   ├── candidates_2024_10_29.txt
 │   ├── pedigree_with_family.txt
 │   ├── weight_ebvs_for_app_with_family.txt
-│   └── length_ebvs_for_app_with_family.txt
+│   ├── length_ebvs_for_app_with_family.txt
+│   └── shiny_output.txt  # Sample output data
+├── AlloMate.Rproj        # RStudio project file
 └── README.md
 ```
 
