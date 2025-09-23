@@ -1,6 +1,14 @@
 # Load All Functions
 # This file sources all function files in the correct order
 
+# Initialize variables if they don't exist (for standalone usage)
+if (!exists("optisel_available")) {
+  optisel_available <<- FALSE
+}
+if (!exists("kinship2_available")) {
+  kinship2_available <<- FALSE
+}
+
 # Use the global app_dir variable set in global.R, or determine it if not available
 if (exists("app_dir")) {
   # Use existing app_dir variable
@@ -60,12 +68,30 @@ if (!exists("custom_candes")) {
     if (exists("custom_candes") && exists("custom_opticont") && exists("custom_noffspring") && exists("custom_matings")) {
       # Set the flag to indicate fallback is available
       custom_ocs_available <<- TRUE
+      
+      # Only create function aliases if optiSel is not available
+      # (optiSel functions are locked bindings and cannot be overwritten)
+      if (!exists("optisel_available") || !optisel_available) {
+        candes <<- custom_candes
+        opticont <<- custom_opticont
+        noffspring <<- custom_noffspring
+        matings <<- custom_matings
+      }
     }
   }
 } else {
-  # If functions already exist, make sure the flag is set
+  # If functions already exist, make sure the flag is set and create aliases
   if (exists("custom_candes") && exists("custom_opticont") && exists("custom_noffspring") && exists("custom_matings")) {
     custom_ocs_available <<- TRUE
+    
+    # Only create function aliases if optiSel is not available
+    # (optiSel functions are locked bindings and cannot be overwritten)
+    if (!exists("optisel_available") || !optisel_available) {
+      candes <<- custom_candes
+      opticont <<- custom_opticont
+      noffspring <<- custom_noffspring
+      matings <<- custom_matings
+    }
   }
 }
 

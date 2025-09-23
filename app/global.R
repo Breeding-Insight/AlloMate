@@ -95,13 +95,6 @@ tryCatch({
     # Check if the fallback functions were loaded and flag was set
     if (exists("custom_ocs_available") && custom_ocs_available) {
       message("✅ Custom OCS fallback loaded successfully")
-      
-      # Create aliases for optiSel functions using custom implementations
-      if (exists("custom_candes")) candes <<- custom_candes
-      if (exists("custom_opticont")) opticont <<- custom_opticont
-      if (exists("custom_noffspring")) noffspring <<- custom_noffspring
-      if (exists("custom_matings")) matings <<- custom_matings
-      
       message("📦 OCS functionality enabled via custom fallback")
     } else {
       message("⚠️ Custom OCS fallback not available after loading functions")

@@ -32,13 +32,35 @@ run_ocs <- function(candidates_df, kinship_matrix, ebv_index, desired_inbreeding
   cand <- candes(phen = phen, pKin = sKin)
   con <- list(ub.pKin = desired_inbreeding_rate)
   Offspring <- opticont(method = "max.BV", cand = cand, con = con)
+  
+  # Check if solution is valid (only needed for real optiSel package)
+  if (exists("optisel_available") && optisel_available && "summary" %in% names(Offspring)) {
+    # Check if any constraints failed (OK = FALSE)
+    failed_constraints <- Offspring$summary[Offspring$summary$OK == FALSE & !is.na(Offspring$summary$OK), ]
+    if (nrow(failed_constraints) > 0) {
+      constraint_names <- paste(failed_constraints$Name, collapse = ", ")
+      stop(paste("❌ OCS optimization failed: Constraints not met:", constraint_names,
+                 "Try increasing the inbreeding rate threshold or check your kinship matrix."))
+    }
+  }
+  
   Candidate <- Offspring$parent[, c("Indiv", "Sex", "oc")]
   Candidate$n <- noffspring(Candidate, num_offspring)$nOff
   Candidate <- filter(Candidate, n > 0)
   if (length(unique(Candidate$Sex)) < 2) {
     stop("❌ OCS resulted in only one sex being selected. Cannot generate mating pairs.")
   }
-  Mating <- matings(Candidate, Kin = sKin)
+  
+  # For real optiSel package, subset kinship matrix to match selected candidates
+  if (exists("optisel_available") && optisel_available) {
+    selected_ids <- Candidate$Indiv
+    sKin_subset <- sKin[selected_ids, selected_ids]
+    # optiSel matings function expects the Candidate data frame, not phenotype data
+    Mating <- matings(Candidate, Kin = sKin_subset)
+  } else {
+    # Custom fallback already handles this correctly
+    Mating <- matings(Candidate, Kin = sKin)
+  }
   list(Candidate = Candidate, Mating = Mating)
 }
 
@@ -102,23 +124,46 @@ format_ocs_results <- function(results) {
     rename(`ID` = Indiv, `# of offspring` = n) %>%
     select(ID, Sex, `Optimal Contribution (%)`, `# of offspring`)
   
-  # Format mating table
-  mating_table <- results$Mating %>%
-    rename(
-      Male = Sire,
-      Female = Dam,
-      Kinship = Kin
-    ) %>%
-    mutate_all(as.character)
+  # Format mating table - handle different column naming schemes
+  mating_df <- results$Mating
   
-  # Calculate summary statistics
+  # Check and standardize column names (optiSel vs custom implementation)
+  if ("Sire" %in% names(mating_df)) {
+    mating_df <- mating_df %>% rename(Male = Sire)
+  }
+  if ("Dam" %in% names(mating_df)) {
+    mating_df <- mating_df %>% rename(Female = Dam)
+  }
+  if ("Kin" %in% names(mating_df)) {
+    mating_df <- mating_df %>% rename(Kinship = Kin)
+  } else if ("kinship" %in% names(mating_df)) {
+    mating_df <- mating_df %>% rename(Kinship = kinship)
+  } else if ("coeff" %in% names(mating_df)) {
+    mating_df <- mating_df %>% rename(Kinship = coeff)
+  } else {
+    # If no kinship column found, add a placeholder
+    mating_df$Kinship <- NA
+  }
+  
+  mating_table <- mating_df %>% mutate_all(as.character)
+  
+  # Calculate summary statistics - handle different kinship column names
+  kinship_values <- NA
+  if ("Kin" %in% names(results$Mating)) {
+    kinship_values <- results$Mating$Kin
+  } else if ("kinship" %in% names(results$Mating)) {
+    kinship_values <- results$Mating$kinship
+  } else if ("coeff" %in% names(results$Mating)) {
+    kinship_values <- results$Mating$coeff
+  }
+  
   summary_stats <- list(
     n_candidates = nrow(results$Candidate),
     n_males = sum(results$Candidate$Sex == "male"),
     n_females = sum(results$Candidate$Sex == "female"),
     n_matings = nrow(results$Mating),
     total_offspring = sum(results$Candidate$n),
-    mean_kinship = mean(results$Mating$Kin),
+    mean_kinship = if (all(is.na(kinship_values))) NA else mean(kinship_values, na.rm = TRUE),
     mean_contribution = mean(results$Candidate$oc)
   )
   
@@ -172,10 +217,31 @@ create_ocs_workbook <- function(results, params = NULL) {
   
   # Add mating plan
   openxlsx::addWorksheet(wb, "Mating Plan")
-  mating_df <- results$Mating %>%
-    mutate(Kinship = round(Kin, 4)) %>%
-    select(Sire, Dam, Kinship, n) %>%
-    rename(`# Matings` = n)
+  
+  # Handle different column naming schemes for mating results
+  mating_export <- results$Mating
+  
+  # Standardize kinship column name
+  if ("Kin" %in% names(mating_export)) {
+    mating_export <- mating_export %>% mutate(Kinship = round(Kin, 4))
+  } else if ("kinship" %in% names(mating_export)) {
+    mating_export <- mating_export %>% mutate(Kinship = round(kinship, 4))
+  } else if ("coeff" %in% names(mating_export)) {
+    mating_export <- mating_export %>% mutate(Kinship = round(coeff, 4))
+  } else {
+    mating_export$Kinship <- NA
+  }
+  
+  # Select and rename columns based on what's available
+  if (all(c("Sire", "Dam") %in% names(mating_export))) {
+    mating_df <- mating_export %>%
+      select(Sire, Dam, Kinship, n) %>%
+      rename(`# Matings` = n)
+  } else {
+    # Fallback if column names are different
+    mating_df <- mating_export %>%
+      rename(`# Matings` = n)
+  }
   openxlsx::writeData(wb, "Mating Plan", mating_df)
   
   wb
