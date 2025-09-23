@@ -57,6 +57,18 @@ run_ocs <- function(candidates_df, kinship_matrix, ebv_index, desired_inbreeding
     sKin_subset <- sKin[selected_ids, selected_ids]
     # optiSel matings function expects the Candidate data frame, not phenotype data
     Mating <- matings(Candidate, Kin = sKin_subset)
+    
+    # optiSel doesn't include kinship values in mating results, so add them manually
+    if (nrow(Mating) > 0 && !"Kin" %in% names(Mating)) {
+      kinship_values <- numeric(nrow(Mating))
+      for (i in seq_len(nrow(Mating))) {
+        sire <- Mating$Sire[i]
+        dam <- Mating$Dam[i]
+        # Use the full kinship matrix since we have original IDs
+        kinship_values[i] <- sKin[sire, dam]
+      }
+      Mating$Kin <- kinship_values
+    }
   } else {
     # Custom fallback already handles this correctly
     Mating <- matings(Candidate, Kin = sKin)
@@ -155,6 +167,8 @@ format_ocs_results <- function(results) {
     kinship_values <- results$Mating$kinship
   } else if ("coeff" %in% names(results$Mating)) {
     kinship_values <- results$Mating$coeff
+  } else if ("Kinship" %in% names(mating_df)) {
+    kinship_values <- mating_df$Kinship
   }
   
   summary_stats <- list(
@@ -236,6 +250,10 @@ create_ocs_workbook <- function(results, params = NULL) {
   if (all(c("Sire", "Dam") %in% names(mating_export))) {
     mating_df <- mating_export %>%
       select(Sire, Dam, Kinship, n) %>%
+      rename(`# Matings` = n)
+  } else if (all(c("Male", "Female") %in% names(mating_export))) {
+    mating_df <- mating_export %>%
+      select(Male, Female, Kinship, n) %>%
       rename(`# Matings` = n)
   } else {
     # Fallback if column names are different
