@@ -44,7 +44,26 @@ run_ocs <- function(candidates_df, kinship_matrix, ebv_index, desired_inbreeding
     }
   }
   
+  # Guard against empty or invalid solution (infeasible constraint)
+  # Check BEFORE extracting columns to catch all edge cases
+  if (is.null(Offspring$parent) || nrow(Offspring$parent) == 0) {
+    stop(paste0("❌ No feasible OCS solution found under the current inbreeding constraint (ub.pKin = ",
+                desired_inbreeding_rate, "). ",
+                "This typically means your candidate population is too closely related to meet this target. ",
+                "Try increasing the inbreeding rate threshold (e.g., 0.10 or higher) or reducing the number of offspring."))
+  }
+  
   Candidate <- Offspring$parent[, c("Indiv", "Sex", "oc")]
+  
+  # Additional check: verify non-zero contributions
+  if (nrow(Candidate) == 0 || all(Candidate$oc == 0)) {
+    stop(paste0("❌ No feasible OCS solution found under the current inbreeding constraint (ub.pKin = ", 
+                desired_inbreeding_rate, "). ",
+                "This typically means your candidate population is too closely related to meet this target. ",
+                "Try increasing the inbreeding rate threshold (e.g., 0.10 or higher) or reducing the number of offspring."))
+  }
+  
+  # Safe to call noffspring now that Candidate has valid data
   Candidate$n <- noffspring(Candidate, num_offspring)$nOff
   Candidate <- filter(Candidate, n > 0)
   if (length(unique(Candidate$Sex)) < 2) {
