@@ -23,7 +23,22 @@ fallback_kinship <- function(ped) {
 #' @param file Uploaded file object
 #' @return List with candidates data frame and male/female ID vectors
 read_candidates <- function(file) {
-  df <- readr::read_table(file$datapath)
+  df <- readr::read_table(file$datapath, show_col_types = FALSE)
+  names(df) <- tolower(names(df))
+
+  if (!"id" %in% names(df) && "candidate" %in% names(df)) {
+    names(df)[names(df) == "candidate"] <- "id"
+  }
+
+  required <- c("id", "sex")
+  missing_cols <- setdiff(required, names(df))
+  if (length(missing_cols) > 0) {
+    stop(sprintf("CANDIDATES: missing required column(s): %s", paste(missing_cols, collapse = ", ")))
+  }
+
+  df$id <- as.character(df$id)
+  df$sex <- toupper(as.character(df$sex))
+
   list(
     candidates = df,
     males = filter(df, sex == "M") %>% pull(id),
@@ -34,8 +49,22 @@ read_candidates <- function(file) {
 #' Clean and validate pedigree data
 #' @param ped Raw pedigree data frame
 #' @return Cleaned pedigree object for kinship calculation
-clean_pedigree <- function(ped) {
-  final_ped <- ped %>%
+clean_pedigree <- function(ped, return_stats = FALSE) {
+  ped_chr <- ped %>%
+    mutate(across(c(id, sire, dam), as.character))
+
+  is_missing_parent <- function(x) {
+    is.na(x) | x == "" | x == "0"
+  }
+
+  total_records <- nrow(ped_chr)
+  unknown_parent_count <- sum(is_missing_parent(ped_chr$sire) | is_missing_parent(ped_chr$dam), na.rm = TRUE)
+  circular_rows <- (ped_chr$id == ped_chr$sire) | (ped_chr$id == ped_chr$dam)
+  circular_reference_count <- sum(circular_rows, na.rm = TRUE)
+  # Count only the extra duplicates (not the first occurrence we'll keep)
+  duplicates_removed <- sum(duplicated(ped_chr$id))
+
+  final_ped <- ped_chr %>%
     mutate(across(c(id, sire, dam), as.factor)) %>%
     mutate(sex = case_when(id %in% sire ~ 0, id %in% dam ~ 1, TRUE ~ 2)) %>%
     {
@@ -47,9 +76,8 @@ clean_pedigree <- function(ped) {
       parents_fixed
     } %>%
     {
-      # Remove duplicates (same as original)
-      doubled <- table(.$id)[table(.$id) > 1] %>% names()
-      .[!.$id %in% doubled, ]
+      # Remove duplicate rows, keeping first occurrence
+      .[!duplicated(.$id), ]
     } %>%
     {
       # Remove circular dependencies (same as original)
@@ -70,7 +98,17 @@ clean_pedigree <- function(ped) {
     } else {
       fallback_pedigree(id, dadid, momid, sex, missid = "0")
     })
-  
+
+  if (return_stats) {
+    stats <- list(
+      records_loaded = total_records,
+      unknown_parent_count = unknown_parent_count,
+      circular_reference_count = circular_reference_count,
+      duplicates_removed = duplicates_removed
+    )
+    return(list(pedigree = final_ped, stats = stats))
+  }
+
   return(final_ped)
 }
 

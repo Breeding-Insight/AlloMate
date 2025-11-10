@@ -32,23 +32,23 @@ create_ocs_trait_inputs <- function(n) {
 #' Generate package status text
 #' @return Formatted status text for display
 generate_package_status <- function() {
-  status_text <- ""
+  optisel_flag <- exists("optisel_available") && isTRUE(optisel_available)
+  fallback_flag <- exists("custom_ocs_available") && isTRUE(custom_ocs_available)
+  quadprog_flag <- exists("quadprog_available") && isTRUE(quadprog_available)
   
-  if (exists("is_webr") && is_webr) {
-    status_text <- paste(status_text, "🌐 WebR environment detected\n", sep = "")
-  }
-  
-  if (exists("optisel_available") && optisel_available) {
-    status_text <- paste(status_text, "✅ optiSel package is available - OCS functionality enabled", sep = "")
-  } else if (exists("custom_ocs_available") && custom_ocs_available) {
-    status_text <- paste(status_text, "✅ Custom OCS fallback is available - OCS functionality enabled", sep = "")
+  if (optisel_flag) {
+    status_text <- "✅ Optimum Contribution Selection: Ready\n📦 Current solver: optiSel"
+  } else if (fallback_flag && quadprog_flag) {
+    status_text <- "✅ Optimum Contribution Selection: Ready\n📦 Current solver: quadprog fallback"
     if (exists("is_webr") && is_webr) {
-      status_text <- paste(status_text, "\n📦 Using custom implementation (optiSel not available in WebR)", sep = "")
+      status_text <- paste(status_text, "\nℹ️ optiSel not available in WebR", sep = "")
     } else {
-      status_text <- paste(status_text, "\n📦 Using custom implementation (optiSel not installed)", sep = "")
+      status_text <- paste(status_text, "\nℹ️ optiSel not installed", sep = "")
     }
+  } else if (fallback_flag && !quadprog_flag) {
+    status_text <- "❌ Optimum Contribution Selection: Not Ready\n⚠️ quadprog package required for fallback\nℹ️ Install with: install.packages('quadprog')"
   } else {
-    status_text <- paste(status_text, "❌ OCS functionality not available - Neither optiSel nor fallback could be loaded", sep = "")
+    status_text <- "❌ Optimum Contribution Selection: Not Ready\n⚠️ Neither optiSel nor fallback available"
   }
   
   status_text

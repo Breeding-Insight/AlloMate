@@ -146,6 +146,18 @@ The app uses a dual implementation approach:
 3. Creates function aliases: `candes`, `opticont`, `noffspring`, `matings`
 4. Status shows: "✅ Custom OCS fallback is available - OCS functionality enabled"
 
+#### Pure-R Fallback Controls & Validation
+- The quadratic-programming path remains the default whenever `quadprog` is present. Set `force_pure_r <- TRUE` (global flag) to exercise the pure-R fallback explicitly.
+- Tune convergence without editing code by setting options before running the app, for example:
+  ```r
+  options(
+    allomate.pure_r_control = list(max_outer_iter = 40, tol_kin = 5e-6),
+    allomate.pure_r_verbose = TRUE
+  )
+  ```
+- Verbose mode emits per-run diagnostics (lambda, kinship gap, gradient norms) and the optimizer always records a `fallback_trace` attribute for downstream inspection.
+- The script `scripts/compare_ocs_results.R` benchmarks quadprog vs. the fallback across multiple kinship targets and stops if any of the following fail: kinship error ≤ 1e-4, kinship error no more than 2× the quadprog error, mean BV gap ≤ 1e-4 (or relative 1e-3), contributions non-negative, and sex-specific sums = 0.5 ± 1e-6.
+
 #### Complete Failure (Neither Available)
 1. Shows error message: "❌ OCS functionality not available"
 2. OCS button shows modal explaining the issue

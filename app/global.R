@@ -17,17 +17,15 @@ is_shiny_server <- grepl("^/home/web_user/", getwd()) || grepl("^/tmp/", getwd()
 # Load non-tidyverse packages first
 required_packages <- c("shiny", "shinyjs", "DT", "openxlsx")
 
-# Try to load quadprog (optional - we have fallback)
-quadprog_available <- FALSE
-tryCatch({
-  if (!require(quadprog, quietly = TRUE)) {
-    install.packages("quadprog", repos = "https://cran.rstudio.com/", quiet = TRUE)
-  }
-  library(quadprog, quietly = TRUE)
-  quadprog_available <- TRUE
-}, error = function(e) {
-  warning(paste("Package quadprog not available (will use fallback optimization):", e$message))
-})
+openxlsx_available <- FALSE
+
+# Try to detect quadprog (optional - we have fallback)
+quadprog_available <- requireNamespace("quadprog", quietly = TRUE)
+if (quadprog_available) {
+  message("✅ quadprog available")
+} else {
+  warning("Package quadprog not available (fallback optimization will be unavailable).")
+}
 
 # Try to load kinship2 (optional - we have fallback)
 kinship2_available <- FALSE
@@ -41,13 +39,30 @@ tryCatch({
   warning(paste("Package kinship2 not available (will use fallback):", e$message))
 })
 
+# Try to load lpSolve for transportation-based mating
+tryCatch({
+  if (!require(lpSolve, quietly = TRUE)) {
+    install.packages("lpSolve", repos = "https://cran.rstudio.com/", quiet = TRUE)
+  }
+  library(lpSolve, quietly = TRUE)
+  message("✅ lpSolve loaded successfully")
+}, error = function(e) {
+  warning(paste("Package lpSolve not available (transportation mating will be unavailable):", e$message))
+})
+
 # Load non-tidyverse packages first
 for (pkg in required_packages) {
   tryCatch({
     library(pkg, character.only = TRUE)
     message(paste("✅ Loaded package:", pkg))
+    if (identical(pkg, "openxlsx")) {
+      openxlsx_available <<- TRUE
+    }
   }, error = function(e) {
     warning(paste("Package", pkg, "not available:", e$message))
+    if (identical(pkg, "openxlsx")) {
+      openxlsx_available <<- FALSE
+    }
   })
 }
 
@@ -60,11 +75,29 @@ tryCatch({
 })
 
 # Detect WebR environment
-is_webr <- exists("webr") && !is.null(webr)
+is_webr <- (exists("webr") && !is.null(webr)) ||
+  grepl("emscripten|wasm", tolower(R.version$platform))
+
+# Configure defaults for webR runtime quirks
+if (is_webr) {
+  options(allomate.force_greedy_mating = TRUE)
+  options(allomate.force_qp_greedy = FALSE)
+  message("🌐 webR environment detected; enabling greedy mating fallback.")
+} else {
+  options(allomate.force_greedy_mating = FALSE)
+  options(allomate.force_qp_greedy = FALSE)
+}
 
 # Try to install and load optiSel - with custom fallback
 optisel_available <- FALSE
 custom_ocs_available <- FALSE
+
+functions_path <- if (app_dir) "R/load_functions.R" else "app/R/load_functions.R"
+if (!file.exists(functions_path)) {
+  stop(paste("Functions file not found at:", functions_path))
+}
+
+source(functions_path)
 
 tryCatch({
   if (!require(optiSel, quietly = TRUE)) {
@@ -74,34 +107,13 @@ tryCatch({
   optisel_available <- TRUE
   message("✅ optiSel loaded successfully")
 }, error = function(e) {
-  message("⚠️ optiSel not available - loading custom OCS fallback")
-  
-  # Load all organized functions (which includes the fallback)
-  tryCatch({
-    # Determine correct path based on current directory
-    if (app_dir) {
-      functions_path <- "R/load_functions.R"
-    } else {
-      functions_path <- "app/R/load_functions.R"
-    }
-    
-    # Check if the functions file exists before sourcing
-    if (!file.exists(functions_path)) {
-      stop(paste("Functions file not found at:", functions_path))
-    }
-    
-    source(functions_path)
-    
-    # Check if the fallback functions were loaded and flag was set
-    if (exists("custom_ocs_available") && custom_ocs_available) {
-      message("✅ Custom OCS fallback loaded successfully")
-      message("📦 OCS functionality enabled via custom fallback")
-    } else {
-      message("⚠️ Custom OCS fallback not available after loading functions")
-    }
-  }, error = function(func_error) {
-    message("❌ Could not load organized functions:", func_error$message)
-  })
+  message("⚠️ optiSel not available - using custom OCS fallback")
+  if (exists("custom_ocs_available") && custom_ocs_available) {
+    message("✅ Custom OCS fallback loaded successfully")
+    message("📦 OCS functionality enabled via custom fallback")
+  } else {
+    message("⚠️ Custom OCS fallback not available after loading functions")
+  }
 })
 
 # Set global flags for app behavior
