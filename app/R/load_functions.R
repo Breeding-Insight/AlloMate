@@ -47,6 +47,61 @@ if (app_dir) {
   source("app/R/ui_helpers.R")
 }
 
+# Load pure XLSX writer utilities
+if (app_dir) {
+  source("R/pure_xlsx_writer.R")
+} else {
+  source("app/R/pure_xlsx_writer.R")
+}
+
+# Helper function to check if optiSel package is actually loaded
+is_optisel_loaded <- function() {
+  tryCatch({
+    # Check if optiSel namespace exists
+    ns <- asNamespace("optiSel")
+    # Check if candes exists in the namespace
+    return(exists("candes", envir = ns, inherits = FALSE))
+  }, error = function(e) {
+    # Namespace doesn't exist - optiSel not loaded
+    return(FALSE)
+  })
+}
+
+# Helper function to safely assign function aliases
+# Checks if binding is locked before attempting assignment
+safe_assign_alias <- function(alias_name, custom_function) {
+  # First check if optiSel is loaded - if so, don't try to overwrite
+  if (is_optisel_loaded()) {
+    # Check if this function exists in optiSel namespace
+    tryCatch({
+      ns <- asNamespace("optiSel")
+      if (exists(alias_name, envir = ns, inherits = FALSE)) {
+        # optiSel is loaded and has this function - don't overwrite
+        return(FALSE)
+      }
+    }, error = function(e) {
+      # Namespace check failed - proceed with assignment
+    })
+  }
+  
+  # Check if the alias already exists in global environment
+  if (exists(alias_name, envir = .GlobalEnv)) {
+    # Try to assign - will fail if locked
+    tryCatch({
+      assign(alias_name, custom_function, envir = .GlobalEnv)
+      return(TRUE)
+    }, error = function(e) {
+      # Binding is locked - can't overwrite
+      # This is expected if optiSel is loaded, so we'll silently skip
+      return(FALSE)
+    })
+  } else {
+    # Function doesn't exist - safe to assign
+    assign(alias_name, custom_function, envir = .GlobalEnv)
+    return(TRUE)
+  }
+}
+
 # Load custom OCS fallback (if not already loaded)
 if (!exists("custom_candes")) {
   if (is_shiny_server) {
@@ -69,13 +124,14 @@ if (!exists("custom_candes")) {
       # Set the flag to indicate fallback is available
       custom_ocs_available <<- TRUE
       
-      # Only create function aliases if optiSel is not available
+      # Only create function aliases if optiSel is not actually loaded
       # (optiSel functions are locked bindings and cannot be overwritten)
-      if (!exists("optisel_available") || !optisel_available) {
-        candes <<- custom_candes
-        opticont <<- custom_opticont
-        noffspring <<- custom_noffspring
-        matings <<- custom_matings
+      if ((!exists("optisel_available") || !optisel_available) && !is_optisel_loaded()) {
+        # Use safe assignment to avoid locked binding errors
+        safe_assign_alias("candes", custom_candes)
+        safe_assign_alias("opticont", custom_opticont)
+        safe_assign_alias("noffspring", custom_noffspring)
+        safe_assign_alias("matings", custom_matings)
       }
     }
   }
@@ -84,13 +140,14 @@ if (!exists("custom_candes")) {
   if (exists("custom_candes") && exists("custom_opticont") && exists("custom_noffspring") && exists("custom_matings")) {
     custom_ocs_available <<- TRUE
     
-    # Only create function aliases if optiSel is not available
+    # Only create function aliases if optiSel is not actually loaded
     # (optiSel functions are locked bindings and cannot be overwritten)
-    if (!exists("optisel_available") || !optisel_available) {
-      candes <<- custom_candes
-      opticont <<- custom_opticont
-      noffspring <<- custom_noffspring
-      matings <<- custom_matings
+    if ((!exists("optisel_available") || !optisel_available) && !is_optisel_loaded()) {
+      # Use safe assignment to avoid locked binding errors
+      safe_assign_alias("candes", custom_candes)
+      safe_assign_alias("opticont", custom_opticont)
+      safe_assign_alias("noffspring", custom_noffspring)
+      safe_assign_alias("matings", custom_matings)
     }
   }
 }

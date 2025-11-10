@@ -265,10 +265,186 @@ server <- function(input, output, session) {
   })
   
   trait_counter <- reactiveVal(1)
+  candidate_status <- reactiveVal(list(ok = FALSE, error = NULL))
   ocs_results_reactive <- reactiveVal()  # For OCS results
   ebv_results_reactive <- reactiveVal()  # For EBV results
   error_message <- reactiveVal("")  # For tracking errors
+  pedigree_validation_stats <- reactiveVal(NULL)
   
+  # Export: Prebuild workbook so Chrome downloads reliably
+  export_cache <- reactiveVal(NULL)
+
+  generate_export_xlsx <- function(dest_file) {
+    use_openxlsx <- exists("openxlsx_available") && isTRUE(openxlsx_available)
+    safe_char <- function(x) if (is.null(x) || length(x) == 0) NA_character_ else as.character(x)
+
+    readme_text <- c(
+      "📊 AlloMate Complete Results Report",
+      "",
+      "This Excel file contains all results from your AlloMate analysis:",
+      "",
+      "📋 Worksheets included:",
+      "1. README - This overview and explanation",
+      "2. Filtered Results - Crosses meeting criteria (positive EBVs, kinship below threshold)",
+      "3. EBV Matrix - Complete matrix view with masked values",
+      "4. OCS Candidates - Selected candidates from Optimum Contribution Selection",
+      "5. Mating Plan - Recommended mating pairs from OCS",
+      "6. Parameters - Analysis parameters used",
+      "",
+      "🔍 Data Details:",
+      "- Filtered Results: Only crosses with positive EBVs and kinship below threshold",
+      "- EBV Matrix: All possible crosses with values masked for failed criteria",
+      "- OCS Results: Available only after running Optimum Contribution Selection",
+      "",
+      "📅 Generated on:", as.character(Sys.Date())
+    )
+
+    ebv_results <- ebv_results_reactive()
+    mat_for_excel <- NULL
+    filtered_results_df <- NULL
+    ebv_matrix_df <- NULL
+
+    if (!is.null(ebv_results)) {
+      m_ids <- unique(ebv_results$full_results$Male)
+      f_ids <- unique(ebv_results$full_results$Female)
+      mat_for_excel <- matrix(NA_real_, nrow = length(m_ids), ncol = length(f_ids),
+                              dimnames = list(m_ids, f_ids))
+
+      if (nrow(ebv_results$filt_results_matrix) > 0) {
+        for (i in seq_len(nrow(ebv_results$filt_results_matrix))) {
+          m <- ebv_results$filt_results_matrix$Male[i]
+          f <- ebv_results$filt_results_matrix$Female[i]
+          val <- ebv_results$filt_results_matrix$EBV[i]
+          if (!is.na(m) && !is.na(f) &&
+              m %in% rownames(mat_for_excel) && f %in% colnames(mat_for_excel)) {
+            mat_for_excel[m, f] <- val
+          }
+        }
+      }
+
+      filtered_results_df <- as.data.frame(ebv_results$filt_results_table)
+
+      row_labels <- rownames(mat_for_excel)
+      if (is.null(row_labels)) row_labels <- seq_len(nrow(mat_for_excel))
+      ebv_matrix_df <- data.frame(
+        Male = row_labels,
+        mat_for_excel,
+        check.names = FALSE,
+        stringsAsFactors = FALSE
+      )
+    }
+
+    formatted_results <- NULL
+    if (!is.null(ocs_results_reactive())) {
+      formatted_results <- tryCatch(
+        format_ocs_results(ocs_results_reactive()),
+        error = function(e) {
+          message("format_ocs_results error: ", e$message)
+          NULL
+        }
+      )
+    }
+
+    params_data <- data.frame(
+      Parameter = c("Kinship Threshold", "Desired Inbreeding Rate", "Number of Offspring", "Analysis Date"),
+      Value = c(
+        safe_char(input$thresh),
+        safe_char(input$inbreeding_rate),
+        safe_char(input$num_offspring),
+        as.character(Sys.Date())
+      ),
+      stringsAsFactors = FALSE
+    )
+
+    ok <- FALSE
+    tryCatch({
+      if (use_openxlsx) {
+        wb <- openxlsx::createWorkbook()
+
+        openxlsx::addWorksheet(wb, "README")
+        openxlsx::writeData(wb, "README", readme_text)
+
+        if (!is.null(ebv_results)) {
+          openxlsx::addWorksheet(wb, "Filtered Results")
+          openxlsx::writeData(wb, "Filtered Results", filtered_results_df, rowNames = TRUE)
+
+          openxlsx::addWorksheet(wb, "EBV Matrix")
+          openxlsx::writeData(wb, "EBV Matrix", ebv_matrix_df, rowNames = FALSE)
+        }
+
+        if (!is.null(formatted_results)) {
+          openxlsx::addWorksheet(wb, "OCS Candidates")
+          openxlsx::writeData(wb, "OCS Candidates", formatted_results$candidate_table, rowNames = FALSE)
+
+          openxlsx::addWorksheet(wb, "Mating Plan")
+          openxlsx::writeData(wb, "Mating Plan", formatted_results$mating_table, rowNames = FALSE)
+        }
+
+        openxlsx::addWorksheet(wb, "Parameters")
+        openxlsx::writeData(wb, "Parameters", params_data, rowNames = FALSE)
+
+        openxlsx::saveWorkbook(wb, dest_file, overwrite = TRUE)
+      } else {
+        sheets <- list(
+          README = data.frame(Text = readme_text, stringsAsFactors = FALSE),
+          Parameters = params_data
+        )
+        if (!is.null(filtered_results_df)) sheets$`Filtered Results` <- filtered_results_df
+        if (!is.null(ebv_matrix_df)) sheets$`EBV Matrix` <- ebv_matrix_df
+        if (!is.null(formatted_results)) {
+          sheets$`OCS Candidates` <- as.data.frame(formatted_results$candidate_table)
+          sheets$`Mating Plan` <- as.data.frame(formatted_results$mating_table)
+        }
+        write_xlsx_pure(dest_file, sheets)
+      }
+      ok <- TRUE
+    }, error = function(e) {
+      message("Export error: ", e$message)
+      writeLines(paste("Export failed:", e$message), dest_file, useBytes = TRUE)
+    })
+    ok
+  }
+
+  observeEvent({
+    list(
+      ebv_results_reactive(),
+      ocs_results_reactive(),
+      input$thresh,
+      input$inbreeding_rate,
+      input$num_offspring
+    )
+  }, {
+    tmp <- tempfile(pattern = "allomate_export_", fileext = ".xlsx")
+    if (generate_export_xlsx(tmp) && file.exists(tmp) && file.info(tmp)$size > 0) {
+      old <- export_cache()
+      export_cache(tmp)
+      if (!is.null(old) && file.exists(old)) unlink(old, force = TRUE)
+    } else if (file.exists(tmp)) {
+      unlink(tmp, force = TRUE)
+    }
+  }, ignoreNULL = FALSE)
+
+  session$onSessionEnded(function() {
+    cache <- export_cache()
+    if (!is.null(cache) && file.exists(cache)) unlink(cache, force = TRUE)
+  })
+
+  output$download_all_results <- downloadHandler(
+    filename = function() {
+      paste0("AlloMate_Complete_Results-", Sys.Date(), ".xlsx")
+    },
+    content = function(file) {
+      cache <- export_cache()
+      if (!is.null(cache) && file.exists(cache)) {
+        file.copy(cache, file, overwrite = TRUE)
+      } else {
+        generate_export_xlsx(file)
+      }
+    },
+    contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  )
+  outputOptions(output, "download_all_results", suspendWhenHidden = FALSE)
+
   # Dynamic startup guide
   output$dynamic_guide <- renderUI({
     # Check for errors first
@@ -289,23 +465,37 @@ server <- function(input, output, session) {
     has_kinship_threshold <- !is.null(input$thresh) && input$thresh < 1
     has_traits <- trait_counter() > 0 && any(sapply(1:trait_counter(), function(i) !is.null(input[[paste0("trait_file_", i)]])))
     has_ocs_results <- !is.null(ocs_results_reactive())
+
+    # Determine error type from error message, if not working properly, update the grep logic
+    pedigree_error <- current_error != "" && grepl("error|pedigree|kinship", current_error, ignore.case = TRUE)
+    trait_error <- current_error != "" && grepl("error|ebv|trait|weight", current_error, ignore.case = TRUE)
+    ocs_error <- current_error != "" && grepl("error|ocs", current_error, ignore.case = TRUE)
+
+    cs <- candidate_status()
+    candidate_ready <- isTRUE(cs$ok)
+    candidate_error_flag <- !is.null(cs$error)
+
+    # Helper to decide icon per step
+    get_step_icon <- function(has_item, error_flag) {
+      if (error_flag) {
+        "❌"
+      } else if (has_item) {
+        "✅"
+      } else {
+        "⬜"
+      }
+    }
     
     # Build step-by-step guide
     steps <- c()
     
     # Step 1: Candidates
-    if (has_candidates) {
-      steps <- c(steps, "<p><strong>✅ Step 1:</strong> Upload your candidate list to begin the analysis</p>")
-    } else {
-      steps <- c(steps, "<p><strong>Step 1:</strong> Upload your candidate list to begin the analysis</p>")
-    }
+    step1_icon <- get_step_icon(candidate_ready, candidate_error_flag)
+    steps <- c(steps, sprintf("<p><strong>%s Step 1:</strong> Upload your candidate list to begin the analysis</p>", step1_icon))
     
     # Step 2: Pedigree
-    if (has_pedigree) {
-      steps <- c(steps, "<p><strong>✅ Step 2:</strong> Upload your pedigree file for kinship calculations</p>")
-    } else {
-      steps <- c(steps, "<p><strong>Step 2:</strong> Upload your pedigree file for kinship calculations</p>")
-    }
+    step2_icon <- get_step_icon(has_pedigree, pedigree_error)
+    steps <- c(steps, sprintf("<p><strong>%s Step 2:</strong> Upload your pedigree file for kinship calculations</p>", step2_icon))
     
     # Step 3: Kinship threshold
     if (has_pedigree) {
@@ -315,18 +505,12 @@ server <- function(input, output, session) {
     }
     
     # Step 4: Traits
-    if (has_traits) {
-      steps <- c(steps, "<p><strong>✅ Step 4:</strong> Add trait files and weights for breeding value analysis</p>")
-    } else {
-      steps <- c(steps, "<p><strong>Step 4:</strong> Add trait files and weights for breeding value analysis</p>")
-    }
+    step4_icon <- get_step_icon(has_traits, trait_error)
+    steps <- c(steps, sprintf("<p><strong>%s Step 4:</strong> Add trait files and weights for breeding value analysis</p>", step4_icon))
     
     # Step 5: OCS
-    if (has_ocs_results) {
-      steps <- c(steps, "<p><strong>✅ Step 5:</strong> Configure OCS parameters and run analysis</p>")
-    } else {
-      steps <- c(steps, "<p><strong>Step 5:</strong> Configure OCS parameters and run analysis</p>")
-    }
+    step5_icon <- get_step_icon(has_ocs_results, ocs_error)
+    steps <- c(steps, sprintf("<p><strong>%s Step 5:</strong> Configure OCS parameters and run analysis</p>", step5_icon))
     
     # Add completion message if all steps are done
     if (has_ocs_results) {
@@ -338,6 +522,188 @@ server <- function(input, output, session) {
     }
     
     HTML(paste(steps, collapse = ""))
+  })
+  
+  # File status display
+  output$file_status_display <- renderUI({
+    # Check what files/data are ready
+    has_candidates <- !is.null(input$candidate_file)
+    has_pedigree <- !is.null(input$pedigree_file)
+    has_ebv <- !is.null(ebv_results_reactive())
+    has_ocs <- !is.null(ocs_results_reactive())
+    
+    # Check for errors
+    current_error <- error_message()
+    has_error <- current_error != ""
+    
+    cs <- candidate_status()
+    candidate_ready <- isTRUE(cs$ok)
+    candidate_error_flag <- !is.null(cs$error)
+
+    # Determine error type from error message
+    pedigree_error <- has_error && grepl("pedigree|kinship", current_error, ignore.case = TRUE)
+    ebv_error <- has_error && grepl("ebv|trait|weight", current_error, ignore.case = TRUE)
+    ocs_error <- has_error && grepl("ocs", current_error, ignore.case = TRUE)
+    
+    # Helper function to determine status icon and text
+    get_status <- function(has_data, uploaded, has_specific_error, ready_text = "Ready", pending_text = "Not uploaded", error_text = "Error") {
+      if (has_specific_error) {
+        list(icon = "❌", text = paste0("<span style='color: #dc3545;'>", error_text, "</span>"))
+      } else if (has_data) {
+        list(icon = "✅", text = paste0("<span style='color: #28a745;'>", ready_text, "</span>"))
+      } else if (uploaded) {
+        list(icon = "⬜", text = paste0("<span style='color: #ffc107;'>Processing...</span>"))
+      } else {
+        list(icon = "⬜", text = paste0("<span style='color: #6c757d;'>", pending_text, "</span>"))
+      }
+    }
+    
+    # Candidate status with explicit tracking
+    candidate_status_ui <- if (candidate_error_flag) {
+      list(icon = "❌", text = "<span style='color: #dc3545;'>Error</span>")
+    } else if (candidate_ready) {
+      list(icon = "✅", text = "<span style='color: #28a745;'>Ready</span>")
+    } else if (has_candidates) {
+      list(icon = "⬜", text = "<span style='color: #ffc107;'>Processing...</span>")
+    } else {
+      list(icon = "⬜", text = "<span style='color: #6c757d;'>Not uploaded</span>")
+    }
+    
+    # Pedigree status
+    pedigree_status <- get_status(has_pedigree, has_pedigree, pedigree_error, 
+                                  "Ready", "Not uploaded", "Error")
+    
+    # EBV status - can error if uploaded but processing failed
+    ebv_status <- get_status(has_ebv, 
+                            has_candidates && has_pedigree, 
+                            ebv_error, 
+                            "Ready", "Pending", "Error")
+    
+    # OCS status
+    ocs_status <- get_status(has_ocs, FALSE, ocs_error, 
+                            "Ready", "Not run", "Error")
+    
+    # Create status lines with emojis
+    status_lines <- c(
+      paste0(
+        candidate_status_ui$icon,
+        " <strong>Candidate List:</strong> ",
+        candidate_status_ui$text
+      ),
+      paste0(
+        pedigree_status$icon,
+        " <strong>Pedigree Data:</strong> ",
+        pedigree_status$text
+      ),
+      paste0(
+        ebv_status$icon,
+        " <strong>EBV Matrix:</strong> ",
+        ebv_status$text
+      ),
+      paste0(
+        ocs_status$icon,
+        " <strong>OCS Results:</strong> ",
+        ocs_status$text
+      )
+    )
+    
+    # Check if all files are ready for download
+    all_ready <- candidate_ready && has_pedigree && has_ebv
+    
+    download_status <- if (has_error) {
+      "<div style='background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 8px; margin-top: 10px; border-radius: 3px;'>
+        <p style='color: #721c24; margin: 0; font-size: 12px;'><strong>⚠️ Error detected.</strong> Check the startup guide above for details.</p>
+      </div>"
+    } else if (all_ready) {
+      "<div style='background-color: #d4edda; border: 1px solid #c3e6cb; padding: 8px; margin-top: 10px; border-radius: 3px;'>
+        <p style='color: #155724; margin: 0; font-size: 12px;'><strong>✅ Download ready!</strong> All core data is available.</p>
+      </div>"
+    } else {
+      "<div style='background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 8px; margin-top: 10px; border-radius: 3px;'>
+        <p style='color: #6c757d; margin: 0; font-size: 12px;'>Upload required files to enable download.</p>
+      </div>"
+    }
+    
+    HTML(paste0(
+      "<div style='font-size: 12px; line-height: 1.8;'>",
+      paste(status_lines, collapse = "<br>"),
+      "</div>",
+      download_status
+    ))
+  })
+  
+  output$pedigree_status_display <- renderUI({
+    stats <- pedigree_validation_stats()
+    if (is.null(stats)) {
+      return(NULL)
+    }
+
+    get_count <- function(val) {
+      if (is.null(val) || is.na(val)) {
+        0L
+      } else {
+        as.integer(val)
+      }
+    }
+
+    format_count <- function(val) {
+      format(get_count(val), big.mark = ",", scientific = FALSE)
+    }
+
+    records <- format_count(stats$records_loaded)
+    unknown_count <- get_count(stats$unknown_parent_count)
+    circular_count <- get_count(stats$circular_reference_count)
+    missing_count <- get_count(stats$missing_candidates)
+    duplicates <- get_count(stats$duplicates_removed)
+
+    green_box <- paste0(
+      "<div style='background-color: #d4edda; border: 1px solid #c3e6cb; padding: 8px; border-radius: 3px; margin-top: 10px; font-size: 12px;'>",
+      "✅ ", records, " records loaded",
+      "</div>"
+    )
+
+    # Build yellow box warnings only for non-zero counts
+    yellow_warnings <- c()
+    if (unknown_count > 0) {
+      yellow_warnings <- c(yellow_warnings, 
+        paste0("<p style='margin: ", if(length(yellow_warnings) == 0) "0" else "4px 0 0", ";'>⚠️ ", 
+               format_count(stats$unknown_parent_count), 
+               " individuals with unknown parent(s) (treated as founders)</p>"))
+    }
+    if (circular_count > 0) {
+      yellow_warnings <- c(yellow_warnings,
+        paste0("<p style='margin: ", if(length(yellow_warnings) == 0) "0" else "4px 0 0", ";'>⚠️ ", 
+               format_count(stats$circular_reference_count),
+               " circular references detected and broken at earliest generation</p>"))
+    }
+    if (missing_count > 0) {
+      yellow_warnings <- c(yellow_warnings,
+        paste0("<p style='margin: ", if(length(yellow_warnings) == 0) "0" else "4px 0 0", ";'>⚠️ ", 
+               format_count(stats$missing_candidates),
+               " selection candidates missing from pedigree</p>"))
+    }
+    
+    yellow_box <- if (length(yellow_warnings) > 0) {
+      paste0(
+        "<div style='background-color: #fff3cd; border: 1px solid #ffeeba; padding: 8px; border-radius: 3px; margin-top: 6px; font-size: 12px;'>",
+        paste(yellow_warnings, collapse = ""),
+        "</div>"
+      )
+    } else {
+      ""
+    }
+
+    red_box <- if (duplicates > 0) {
+      paste0(
+        "<div style='background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 8px; border-radius: 3px; margin-top: 6px; font-size: 12px;'>",
+        "❌ ", format(duplicates, big.mark = ",", scientific = FALSE), " duplicates removed",
+        "</div>"
+      )
+    } else {
+      ""
+    }
+
+    HTML(paste0(green_box, yellow_box, red_box))
   })
   
   observeEvent(input$add_trait, {
@@ -362,7 +728,23 @@ server <- function(input, output, session) {
   
   candidates_data <- reactive({
     req(input$candidate_file)
-    read_candidates(input$candidate_file)
+
+    tryCatch({
+      res <- read_candidates(input$candidate_file)
+      candidate_status(list(ok = TRUE, error = NULL))
+
+      current_err <- error_message()
+      if (current_err != "" && grepl("^Error processing candidates", current_err)) {
+        error_message("")
+      }
+
+      res
+    }, error = function(e) {
+      candidate_status(list(ok = FALSE, error = e$message))
+      error_message(paste0("Error processing candidates: ", e$message))
+      validate(need(FALSE, e$message))
+      NULL
+    })
   })
   
   pedigree_data <- reactiveVal(NULL)
@@ -374,7 +756,17 @@ server <- function(input, output, session) {
     
     tryCatch({
       raw_ped <- readr::read_table(input$pedigree_file$datapath)
-      final_ped <- clean_pedigree(raw_ped)
+      cleaned_ped <- clean_pedigree(raw_ped, return_stats = TRUE)
+      final_ped <- cleaned_ped$pedigree
+      
+      # Check for candidates missing from pedigree
+      candidate_ids <- candidates_data()$candidates$id
+      pedigree_ids <- as.character(raw_ped$id)
+      missing_candidates <- sum(!candidate_ids %in% pedigree_ids)
+      
+      # Add missing candidates count to stats
+      cleaned_ped$stats$missing_candidates <- missing_candidates
+      
       kinship_res <- compute_kinship_matrix(final_ped, males, females)
       
       output$quadrants_table <- DT::renderDT({
@@ -385,11 +777,13 @@ server <- function(input, output, session) {
       })
       
       pedigree_data(list(results = kinship_res$results, quads = kinship_res$quads))
+      pedigree_validation_stats(cleaned_ped$stats)
       
       error_message("")  # Clear any previous errors
       output$message1 <- renderText("✅ Kinship matrix generated successfully.")
     }, error = function(e) {
       error_message(paste0("Error processing pedigree: ", e$message))
+      pedigree_validation_stats(NULL)
       output$message1 <- renderText(
         paste0("❌ Error processing pedigree: Make sure your pedigree is clean and valid.\n",
                "Original error: ", e$message)
@@ -487,89 +881,18 @@ server <- function(input, output, session) {
         "✅ EBV matrix generated successfully."
     )
     
-    output$download_all_results <- downloadHandler(
-      filename = function() {
-        paste0("AlloMate_Complete_Results-", Sys.Date(), ".xlsx")
-      },
-      content = function(file) {
-        wb <- openxlsx::createWorkbook()
-        
-        # Add comprehensive README worksheet
-        openxlsx::addWorksheet(wb, "README")
-        readme_text <- c(
-          "📊 AlloMate Complete Results Report",
-          "",
-          "This Excel file contains all results from your AlloMate analysis:",
-          "",
-          "📋 Worksheets included:",
-          "1. README - This overview and explanation",
-          "2. Filtered Results - Crosses meeting criteria (positive EBVs, kinship below threshold)",
-          "3. EBV Matrix - Complete matrix view with masked values",
-          "4. OCS Candidates - Selected candidates from Optimum Contribution Selection",
-          "5. Mating Plan - Recommended mating pairs from OCS",
-          "6. Parameters - Analysis parameters used",
-          "",
-          "🔍 Data Details:",
-          "- Filtered Results: Only crosses with positive EBVs and kinship below threshold",
-          "- EBV Matrix: All possible crosses with values masked for failed criteria",
-          "- OCS Results: Available only after running Optimum Contribution Selection",
-          "",
-          "📅 Generated on:", as.character(Sys.Date())
-        )
-        openxlsx::writeData(wb, "README", readme_text)
-        
-        # Add kinship/EBV results if available
-        ebv_results <- ebv_results_reactive()
-        if (!is.null(ebv_results)) {
-          openxlsx::addWorksheet(wb, "Filtered Results")
-          openxlsx::writeData(wb, "Filtered Results", ebv_results$filt_results_table, rowNames = TRUE)
-          
-          openxlsx::addWorksheet(wb, "EBV Matrix")
-          m_ids <- unique(ebv_results$full_results$Male)
-          f_ids <- unique(ebv_results$full_results$Female)
-          mat_for_excel <- matrix(NA_real_, nrow = length(m_ids), ncol = length(f_ids),
-                                  dimnames = list(m_ids, f_ids))
-          
-          for (i in seq_len(nrow(ebv_results$filt_results_matrix))) {
-            m <- ebv_results$filt_results_matrix$Male[i]
-            f <- ebv_results$filt_results_matrix$Female[i]
-            val <- ebv_results$filt_results_matrix$EBV[i]
-            mat_for_excel[m, f] <- val
-          }
-          openxlsx::writeData(wb, "EBV Matrix", mat_for_excel, rowNames = TRUE)
-        }
-        
-        # Add OCS results if available
-        if (exists("ocs_results_reactive") && !is.null(ocs_results_reactive())) {
-          results <- ocs_results_reactive()
-          formatted_results <- format_ocs_results(results)
-          
-          openxlsx::addWorksheet(wb, "OCS Candidates")
-          openxlsx::writeData(wb, "OCS Candidates", formatted_results$candidate_table, rowNames = FALSE)
-          
-          openxlsx::addWorksheet(wb, "Mating Plan")
-          openxlsx::writeData(wb, "Mating Plan", formatted_results$mating_table, rowNames = FALSE)
-        }
-        
-        # Add parameters worksheet
-        openxlsx::addWorksheet(wb, "Parameters")
-        params_data <- data.frame(
-          Parameter = c("Kinship Threshold", "Desired Inbreeding Rate", "Number of Offspring", "Analysis Date"),
-          Value = c(
-            as.character(input$thresh),
-            as.character(input$inbreeding_rate),
-            as.character(input$num_offspring),
-            as.character(Sys.Date())
-          )
-        )
-        openxlsx::writeData(wb, "Parameters", params_data, rowNames = FALSE)
-        
-        openxlsx::saveWorkbook(wb, file, overwrite = TRUE)
-      }
-    )
+    # download handler defined at top-level above
   })
   
   #### OCS Server Logic ####
+  
+  observeEvent(input$force_greedy_mating, {
+    options(allomate.force_greedy_mating = isTRUE(input$force_greedy_mating))
+  }, ignoreNULL = FALSE)
+  
+  observeEvent(input$force_qp_greedy, {
+    options(allomate.force_qp_greedy = isTRUE(input$force_qp_greedy))
+  }, ignoreNULL = FALSE)
   
   observeEvent(input$run_ocs_btn, {
     req(input$pedigree_file, input$candidate_file)
@@ -585,6 +908,9 @@ server <- function(input, output, session) {
       ))
       return(NULL)
     }
+    
+    options(allomate.force_greedy_mating = isTRUE(input$force_greedy_mating))
+    options(allomate.force_qp_greedy = isTRUE(input$force_qp_greedy))
     
     tryCatch({
       ped_data <- read.table(input$pedigree_file$datapath, header = TRUE)
@@ -609,6 +935,9 @@ server <- function(input, output, session) {
       
       joint_ebvs <- calculate_index(ebv_result$joint_ebvs, ebv_result$rel_weights)
       candidates <- left_join(candidates, joint_ebvs, by = c("id" = "ID"))
+      
+      # Set seed for reproducibility when testing optiSel vs fallback
+      set.seed(42)
       
       results <- run_ocs(
         candidates_df = candidates,
@@ -651,6 +980,19 @@ server <- function(input, output, session) {
         options = list(pageLength = 10, autoWidth = TRUE),
         rownames = FALSE
       )
+  })
+  
+  output$ocs_solver_note <- renderUI({
+    req(ocs_results_reactive())
+    formatted_results <- format_ocs_results(ocs_results_reactive())
+    info <- formatted_results$summary_stats$mating_info
+    if (is.null(info) || is.na(info) || info == "") {
+      return(NULL)
+    }
+    div(
+      style = "margin: 10px 0; padding: 10px; background-color: #fff8e1; border-left: 4px solid #ffb300; font-size: 13px;",
+      tags$strong("Solver note: "), info
+    )
   })
   
   #### R Code Display and Download ####

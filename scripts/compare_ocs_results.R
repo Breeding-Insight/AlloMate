@@ -69,17 +69,167 @@ joint_ebvs$index_val <- as.vector(
 candidates_with_ebv <- left_join(candidates, joint_ebvs, by = c("id" = "ID")) %>%
   filter(!is.na(index_val))
 
-# Run custom OCS
-cat("🚀 Running custom OCS...\n")
-custom_results <- run_custom_ocs(
-  candidates_df = candidates_with_ebv,
-  kinship_matrix = kinship_matrix,
-  ebv_index = candidates_with_ebv$index_val,
-  desired_inbreeding_rate = TEST_PARAMS$inbreeding_rate,
-  num_offspring = TEST_PARAMS$num_offspring
+# Prepare candidate objects for solver comparisons
+phen <- data.frame(
+  Indiv = candidates_with_ebv$id,
+  Sex = ifelse(candidates_with_ebv$sex == "M", "male", "female"),
+  BV = candidates_with_ebv$index_val,
+  isCandidate = TRUE,
+  stringsAsFactors = FALSE
 )
 
-cat("  ✓ Custom OCS completed\n\n")
+candidate_ids <- candidates_with_ebv$id
+sKin <- kinship_matrix[candidate_ids, candidate_ids]
+rownames(sKin) <- candidate_ids
+colnames(sKin) <- candidate_ids
+
+cand_obj <- custom_candes(phen = phen, pKin = sKin, quiet = TRUE)
+
+with_force_pure_r <- function(flag, expr) {
+  env <- globalenv()
+  had_force <- exists("force_pure_r", envir = env, inherits = FALSE)
+  if (had_force) {
+    old_force <- get("force_pure_r", envir = env, inherits = FALSE)
+  }
+  assign("force_pure_r", flag, envir = env)
+  on.exit({
+    if (had_force) {
+      assign("force_pure_r", old_force, envir = env)
+    } else {
+      rm("force_pure_r", envir = env)
+    }
+  }, add = TRUE)
+  eval(substitute(expr), envir = parent.frame())
+}
+
+kin_targets <- unique(pmin(
+  0.99,
+  pmax(
+    1e-6,
+    c(
+      TEST_PARAMS$inbreeding_rate,
+      TEST_PARAMS$inbreeding_rate * 0.85,
+      TEST_PARAMS$inbreeding_rate * 1.15
+    )
+  )
+))
+
+benchmark_rows <- vector("list", length(kin_targets))
+benchmark_details <- vector("list", length(kin_targets))
+
+cat("🧪 Comparing quadprog vs pure-R fallback across targets...\n")
+for (i in seq_along(kin_targets)) {
+  target <- kin_targets[i]
+  con <- list(ub.pKin = target)
+
+  quad_opt <- with_force_pure_r(
+    FALSE,
+    custom_opticont(method = "max.BV", cand = cand_obj, con = con, quiet = TRUE)
+  )
+  pure_opt <- with_force_pure_r(
+    TRUE,
+    custom_opticont(method = "max.BV", cand = cand_obj, con = con, quiet = TRUE)
+  )
+
+  trace_info <- pure_opt$fallback_trace
+  if (is.null(trace_info)) trace_info <- list()
+  trace_backtracks <- if (length(trace_info) > 0) {
+    suppressWarnings(vapply(trace_info, function(x) {
+      if (is.null(x$backtracks)) NA_real_ else x$backtracks
+    }, numeric(1)))
+  } else {
+    numeric(0)
+  }
+  trace_grad <- if (length(trace_info) > 0) {
+    suppressWarnings(vapply(trace_info, function(x) {
+      if (is.null(x$grad_norm)) NA_real_ else x$grad_norm
+    }, numeric(1)))
+  } else {
+    numeric(0)
+  }
+
+  max_backtracks <- if (length(trace_backtracks) > 0 && any(is.finite(trace_backtracks))) {
+    max(trace_backtracks, na.rm = TRUE)
+  } else {
+    NA_real_
+  }
+  mean_grad <- if (length(trace_grad) > 0 && any(is.finite(trace_grad))) {
+    mean(trace_grad, na.rm = TRUE)
+  } else {
+    NA_real_
+  }
+  last_inner <- if (length(trace_info) > 0) {
+    entry <- trace_info[[length(trace_info)]]
+    if (is.null(entry$inner_iter)) NA_integer_ else entry$inner_iter
+  } else {
+    NA_integer_
+  }
+
+  quad_error <- abs(quad_opt$mean.kin - target)
+  pure_error <- abs(pure_opt$mean.kin - target)
+  bv_diff <- abs(pure_opt$mean.bv - quad_opt$mean.bv)
+  rel_bv_diff <- if (abs(quad_opt$mean.bv) > 1e-10) bv_diff / abs(quad_opt$mean.bv) else 0
+
+  parent_df <- pure_opt$parent
+  male_sum <- sum(parent_df$oc[parent_df$Sex == "male"])
+  female_sum <- sum(parent_df$oc[parent_df$Sex == "female"])
+  min_contrib <- min(parent_df$oc)
+
+  kin_ok <- pure_error <= 1e-4 && pure_error <= 2 * max(quad_error, 1e-10)
+  bv_ok <- bv_diff <= 1e-4 || rel_bv_diff <= 1e-3
+  contrib_ok <- (min_contrib >= -1e-8) &&
+    (abs(male_sum - 0.5) <= 1e-6) &&
+    (abs(female_sum - 0.5) <= 1e-6)
+
+  benchmark_rows[[i]] <- tibble(
+    target_kin = target,
+    mean_kin_quad = quad_opt$mean.kin,
+    mean_kin_pure = pure_opt$mean.kin,
+    kin_error_quad = quad_error,
+    kin_error_pure = pure_error,
+    mean_bv_quad = quad_opt$mean.bv,
+    mean_bv_pure = pure_opt$mean.bv,
+    bv_gap = bv_diff,
+    kin_ok = kin_ok,
+    bv_ok = bv_ok,
+    contrib_ok = contrib_ok,
+    all_checks = kin_ok & bv_ok & contrib_ok,
+    trace_len = length(trace_info),
+    max_backtracks = max_backtracks,
+    mean_grad_norm = mean_grad,
+    last_inner_iter = last_inner
+  )
+
+  benchmark_details[[i]] <- list(
+    target = target,
+    quad_opt = quad_opt,
+    pure_opt = pure_opt,
+    trace = trace_info
+  )
+}
+
+benchmark_table <- bind_rows(benchmark_rows)
+print(benchmark_table)
+
+if (any(!benchmark_table$all_checks)) {
+  stop("❌ Pure-R fallback failed tolerance checks. Investigate benchmark_table for details.")
+} else {
+  cat("  ✓ Pure-R fallback matches quadprog within tolerances for tested targets.\n\n")
+}
+
+default_target <- TEST_PARAMS$inbreeding_rate
+custom_results <- with_force_pure_r(
+  FALSE,
+  run_custom_ocs(
+    candidates_df = candidates_with_ebv,
+    kinship_matrix = kinship_matrix,
+    ebv_index = candidates_with_ebv$index_val,
+    desired_inbreeding_rate = default_target,
+    num_offspring = TEST_PARAMS$num_offspring
+  )
+)
+
+cat("🚀 Default target quadprog run completed for comparison outputs.\n\n")
 
 # Check if optiSel is available
 optisel_available <- FALSE

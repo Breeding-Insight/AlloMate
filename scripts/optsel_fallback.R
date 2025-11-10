@@ -625,10 +625,6 @@ server <- function(input, output, session) {
       req(ocs_results())
       results <- ocs_results()
       
-      wb <- openxlsx::createWorkbook()
-      
-      # Add README
-      addWorksheet(wb, "README")
       readme_text <- c(
         "Optimum Contribution Selection Results",
         "",
@@ -645,25 +641,41 @@ server <- function(input, output, session) {
         "",
         "The patterns in your genetic data have been thoroughly analyzed."
       )
-      writeData(wb, "README", readme_text)
-      
-      # Add optimal contributions
-      addWorksheet(wb, "Optimal Contributions")
+
+      use_openxlsx <- exists("openxlsx_available") && isTRUE(openxlsx_available)
+
       contrib_df <- results$Candidate %>%
         select(Indiv, Sex, oc, n) %>%
         mutate(`Contribution (%)` = round(oc * 100, 2)) %>%
         rename(`ID` = Indiv, `# Offspring` = n)
-      writeData(wb, "Optimal Contributions", contrib_df)
-      
-      # Add mating plan
-      addWorksheet(wb, "Mating Plan")
+
       mating_df <- results$Mating %>%
         mutate(Kinship = round(Kin, 4)) %>%
         select(Sire, Dam, Kinship, n) %>%
         rename(`# Matings` = n)
-      writeData(wb, "Mating Plan", mating_df)
-      
-      saveWorkbook(wb, file, overwrite = TRUE)
+
+      if (use_openxlsx) {
+        wb <- openxlsx::createWorkbook()
+
+        addWorksheet(wb, "README")
+        writeData(wb, "README", readme_text)
+
+        addWorksheet(wb, "Optimal Contributions")
+        writeData(wb, "Optimal Contributions", contrib_df)
+
+        addWorksheet(wb, "Mating Plan")
+        writeData(wb, "Mating Plan", mating_df)
+
+        saveWorkbook(wb, file, overwrite = TRUE)
+      } else {
+        sheets <- list(
+          README = data.frame(Text = readme_text, stringsAsFactors = FALSE),
+          `Optimal Contributions` = as.data.frame(contrib_df, stringsAsFactors = FALSE),
+          `Mating Plan` = as.data.frame(mating_df, stringsAsFactors = FALSE)
+        )
+
+        write_xlsx_pure(file, sheets)
+      }
     }
   )
 }

@@ -3,60 +3,6 @@
 
 #### Custom OCS Implementation Functions ####
 
-#' Fallback optimization when quadprog is not available
-#' Uses a simple gradient-based approach to find optimal contributions
-fallback_optimization <- function(bv_vec, K, male_idx, female_idx, target_kinship, lambda) {
-  n <- length(bv_vec)
-  
-  # Initialize with equal contributions
-  oc <- rep(1/n, n)
-  
-  # Ensure sex balance constraints
-  oc[male_idx] <- oc[male_idx] * 0.5 / sum(oc[male_idx])
-  oc[female_idx] <- oc[female_idx] * 0.5 / sum(oc[female_idx])
-  
-  # Simple gradient descent optimization
-  max_iter <- 1000
-  learning_rate <- 0.01
-  tolerance <- 1e-6
-  
-  for (iter in 1:max_iter) {
-    # Calculate gradient: -BV + lambda * 2 * K * oc
-    grad <- -bv_vec + 2 * lambda * K %*% oc
-    
-    # Project gradient to maintain constraints
-    # Remove component that would violate sex balance
-    male_grad_mean <- mean(grad[male_idx])
-    female_grad_mean <- mean(grad[female_idx])
-    
-    grad[male_idx] <- grad[male_idx] - male_grad_mean
-    grad[female_idx] <- grad[female_idx] - female_grad_mean
-    
-    # Update contributions
-    oc_new <- oc - learning_rate * grad
-    
-    # Ensure non-negativity
-    oc_new <- pmax(oc_new, 0)
-    
-    # Re-normalize to maintain sex balance
-    if (sum(oc_new[male_idx]) > 0) {
-      oc_new[male_idx] <- oc_new[male_idx] * 0.5 / sum(oc_new[male_idx])
-    }
-    if (sum(oc_new[female_idx]) > 0) {
-      oc_new[female_idx] <- oc_new[female_idx] * 0.5 / sum(oc_new[female_idx])
-    }
-    
-    # Check convergence
-    if (max(abs(oc_new - oc)) < tolerance) {
-      break
-    }
-    
-    oc <- oc_new
-  }
-  
-  return(oc)
-}
-
 #' Create candidate object similar to optiSel::candes
 #' This structures data for optimization algorithms
 custom_candes <- function(phen, pKin, quiet = FALSE) {
@@ -97,119 +43,207 @@ custom_candes <- function(phen, pKin, quiet = FALSE) {
 }
 
 #' Custom implementation of optiSel::opticont
-#' Uses quadratic programming to solve OCS problem
+#' Uses quadratic programming (quadprog) to solve OCS problem
 custom_opticont <- function(method, cand, con, quiet = FALSE) {
-  # Extract method components (e.g., "max.BV" -> maximize BV)
-  optimize_direction <- substr(method, 1, 3)
   target_trait <- substr(method, 5, nchar(method))
-  
-  if(target_trait != "BV") {
+
+  if (target_trait != "BV") {
     stop("❌ Currently only BV optimization is supported")
   }
-  
+
+  # Check if quadprog is available
+  if (!requireNamespace("quadprog", quietly = TRUE)) {
+    stop("❌ quadprog package is required for OCS fallback. Please install it with: install.packages('quadprog')")
+  }
+
+  if (!quiet) {
+    cat("--- Optimization Diagnostics ---\n")
+  }
+
   candidates <- cand$candidates
   n <- nrow(candidates)
-  
-  # Separate males and females for proper contribution allocation
+
   male_idx <- which(candidates$Sex == "male")
   female_idx <- which(candidates$Sex == "female")
-  n_males <- length(male_idx)
-  n_females <- length(female_idx)
-  
-  # Extract kinship matrix for candidates
+
   candidate_ids <- candidates$Indiv
-  K <- cand$kinship[candidate_ids, candidate_ids]
-  
-  # Set up optimization problem
-  # We need to maximize BV while constraining average kinship
-  # Decision variables: contributions (c) for each candidate
-  
-  # Objective: maximize sum(c_i * BV_i)
-  # For quadprog, we minimize -sum(c_i * BV_i)
-  bv_vec <- candidates$BV
-  
-  # Quadratic term: minimize c'Kc (average kinship in next generation)
-  # Linear term: -2 * BV' (to maximize BV)
-  
-  # Build constraint matrix for quadprog
-  # Constraints:
-  # 1. sum(c_males) = 0.5
-  # 2. sum(c_females) = 0.5
-  # 3. c_i >= 0 for all i
-  # 4. Average kinship <= threshold
-  
-  # For quadprog: min(-d'b + 1/2 b'Db) s.t. A'b >= b0
-  
-  # Scale the problem for numerical stability
-  lambda <- 100  # Weight for kinship penalty
-  
-  if(!is.null(con$ub.pKin)) {
-    target_kinship <- con$ub.pKin
+  K <- cand$kinship[candidate_ids, candidate_ids, drop = FALSE]
+  K <- 0.5 * (K + t(K))
+  K <- as.matrix(K)
+  storage.mode(K) <- "double"
+  bv_vec <- as.numeric(candidates$BV)
+
+  target_kinship <- if (!is.null(con$ub.pKin)) {
+    con$ub.pKin
   } else {
-    target_kinship <- mean(K[upper.tri(K)])  # Current mean kinship
-  }
-  
-  # Use penalty method for constrained optimization
-  # Minimize: -BV + lambda * Kinship
-  Dmat <- 2 * lambda * K
-  dvec <- bv_vec
-  
-  # Constraint matrix
-  # Each row of Amat represents a constraint
-  Amat <- matrix(0, n, n + 2)
-  
-  # Sum of male contributions = 0.5
-  Amat[male_idx, 1] <- 1
-  # Sum of female contributions = 0.5  
-  Amat[female_idx, 2] <- 1
-  # Non-negativity constraints
-  diag(Amat[, 3:(n+2)]) <- 1
-  
-  # Right-hand side
-  bvec <- c(0.5, 0.5, rep(0, n))
-  
-  # Try to use quadprog if available, otherwise use fallback optimization
-  tryCatch({
-    if (requireNamespace("quadprog", quietly = TRUE)) {
-      # Use quadprog if available
-      # Make Dmat positive definite if needed
-      eigen_decomp <- eigen(Dmat)
-      if(any(eigen_decomp$values < 1e-8)) {
-        Dmat <- Dmat + diag(1e-6, n)
-      }
-      
-      sol <- quadprog::solve.QP(Dmat, dvec, Amat, bvec, meq = 2)
-      oc <- sol$solution
+    kin_vals <- K[upper.tri(K)]
+    if (length(kin_vals) == 0) {
+      mean(diag(K))
     } else {
-      # Fallback: Simple gradient-based optimization
-      oc <- fallback_optimization(bv_vec, K, male_idx, female_idx, target_kinship, lambda)
+      mean(kin_vals)
     }
-    
-    # Normalize to ensure sum = 1
-    oc <- oc / sum(oc)
-    
-    # Create output similar to optiSel
+  }
+
+  kin_tolerance <- 1e-5
+
+  enforce_sex_balance <- function(oc) {
+    oc <- pmax(oc, 0)
+    if (length(male_idx) > 0) {
+      total_male <- sum(oc[male_idx])
+      if (total_male > 0) {
+        oc[male_idx] <- oc[male_idx] * 0.5 / total_male
+      } else {
+        oc[male_idx] <- rep(0.5 / length(male_idx), length(male_idx))
+      }
+    }
+    if (length(female_idx) > 0) {
+      total_female <- sum(oc[female_idx])
+      if (total_female > 0) {
+        oc[female_idx] <- oc[female_idx] * 0.5 / total_female
+      } else {
+        oc[female_idx] <- rep(0.5 / length(female_idx), length(female_idx))
+      }
+    }
+    oc
+  }
+
+  if (isTRUE(getOption("allomate.force_qp_greedy", FALSE))) {
+    if (!quiet) {
+      cat("Solver used      : heuristic (quadprog bypassed)\n")
+    }
+    shifted_bv <- bv_vec - min(bv_vec, na.rm = TRUE)
+    oc_raw <- if (all(shifted_bv <= 1e-12)) {
+      rep(1 / n, n)
+    } else {
+      shifted_bv
+    }
+    oc_raw <- oc_raw / sum(oc_raw)
+    oc <- enforce_sex_balance(oc_raw)
+
     parent_df <- candidates %>%
-      mutate(oc = oc) %>%
-      select(Indiv, Sex, oc)
-    
-    # Calculate expected kinship in next generation
+      mutate(oc = oc, BV = bv_vec) %>%
+      select(Indiv, Sex, oc, BV)
+
     mean_kinship_next <- as.numeric(t(oc) %*% K %*% oc)
-    
-    if(!quiet) {
-      
+
+    if (!quiet) {
+      top_df <- parent_df %>% arrange(desc(oc)) %>% head(5)
+      cat("\n--- OCS Optimization Diagnostics ---\n")
+      cat(sprintf("Solver used      : heuristic (quadprog bypassed)\n"))
+      cat(sprintf("Target kinship   : %.5f\n", target_kinship))
+      cat(sprintf("Achieved kinship : %.5f\n", mean_kinship_next))
+      cat(sprintf("Mean BV          : %.5f\n", sum(oc * bv_vec)))
+      cat("Top contributions:\n")
+      print(top_df)
+      cat("-------------------------------------\n\n")
     }
-    
+
     result <- list(
       parent = parent_df,
       mean.kin = mean_kinship_next,
       mean.bv = sum(oc * bv_vec),
-      info = "Optimization successful"
+      info = "Heuristic contribution (quadprog bypassed)",
+      solver = "heuristic"
     )
-    
+
     class(result) <- "custom_opticont"
     return(result)
+  }
+
+  tryCatch({
+    best <- local({
+      solve_qp_for_lambda <- function(lambda) {
+        Dmat <- 2 * lambda * K
+        dvec <- as.numeric(bv_vec)
+
+        male_col <- numeric(n)
+        female_col <- numeric(n)
+        if (length(male_idx) > 0) male_col[male_idx] <- 1
+        if (length(female_idx) > 0) female_col[female_idx] <- 1
+
+        if (sum(male_col) == 0 || sum(female_col) == 0) {
+          stop("❌ Need at least one male and one female among candidates to enforce sex-balance constraints.")
+        }
+
+        Amat <- cbind(male_col, female_col, diag(1, n))
+        bvec <- c(0.5, 0.5, rep(0, n))
+
+        storage.mode(Dmat) <- "double"
+        storage.mode(Amat) <- "double"
+        dvec <- as.numeric(dvec)
+        bvec <- as.numeric(bvec)
+
+        eigen_values <- eigen(Dmat, symmetric = TRUE, only.values = TRUE)$values
+        if (any(eigen_values < 1e-8)) {
+          Dmat <- Dmat + diag(1e-6, n)
+        }
+
+        sol <- tryCatch(
+          quadprog::solve.QP(Dmat = Dmat, dvec = dvec, Amat = Amat, bvec = bvec, meq = 2),
+          error = function(e) stop(paste("QP solve failed:", e$message))
+        )
+        oc_qp <- enforce_sex_balance(sol$solution)
+        kin <- as.numeric(t(oc_qp) %*% K %*% oc_qp)
+        list(oc = oc_qp, kin = kin)
+      }
+
+      low <- 1e-6
+      high <- 1e6
+      best_local <- NULL
+
+      for (iter in seq_len(30)) {
+        lambda <- exp((log(low) + log(high)) / 2)
+        current <- solve_qp_for_lambda(lambda)
+
+        if (is.null(best_local) || abs(current$kin - target_kinship) < abs(best_local$kin - target_kinship)) {
+          best_local <- current
+        }
+
+        if (abs(current$kin - target_kinship) < kin_tolerance) {
+          best_local <- current
+          break
+        }
+
+        if (current$kin > target_kinship) {
+          low <- lambda
+        } else {
+          high <- lambda
+        }
+      }
+
+      best_local
+    })
+
+    oc <- enforce_sex_balance(best$oc)
+
+    parent_df <- candidates %>%
+      mutate(oc = oc, BV = bv_vec) %>%
+      select(Indiv, Sex, oc, BV)
+
+    mean_kinship_next <- as.numeric(t(oc) %*% K %*% oc)
     
+    if (!quiet) {
+      top_df <- parent_df %>% arrange(desc(oc)) %>% head(5)
+      cat("\n--- OCS Optimization Diagnostics ---\n")
+      cat(sprintf("Solver used      : quadprog\n"))
+      cat(sprintf("Target kinship   : %.5f\n", target_kinship))
+      cat(sprintf("Achieved kinship : %.5f\n", mean_kinship_next))
+      cat(sprintf("Mean BV          : %.5f\n", sum(oc * bv_vec)))
+      cat("Top contributions:\n")
+      print(top_df)
+      cat("-------------------------------------\n\n")
+    }
+
+    result <- list(
+      parent = parent_df,
+      mean.kin = mean_kinship_next,
+      mean.bv = sum(oc * bv_vec),
+      info = "Optimization successful (quadprog)",
+      solver = "quadprog"
+    )
+
+    class(result) <- "custom_opticont"
+    return(result)
   }, error = function(e) {
     stop(paste("❌ Optimization failed:", e$message))
   })
@@ -218,157 +252,208 @@ custom_opticont <- function(method, cand, con, quiet = FALSE) {
 #' Calculate number of offspring from optimum contributions
 #' Replicates optiSel::noffspring functionality
 custom_noffspring <- function(Candidate, N) {
-  # Validate input
   if(!all(c("Indiv", "Sex", "oc") %in% names(Candidate))) {
     stop("❌ Candidate must contain columns: Indiv, Sex, oc")
   }
-  
-  # Calculate raw offspring numbers
-  # Each individual contributes to N * oc offspring
+
+  has_bv <- "BV" %in% names(Candidate)
+
   raw_offspring <- N * Candidate$oc
-  
-  # Round while maintaining sum constraints
+
   males <- Candidate$Sex == "male"
   females <- Candidate$Sex == "female"
-  
+
   nOff <- numeric(nrow(Candidate))
-  
-  # Smart rounding to maintain exact totals
+
   if(sum(males) > 0) {
     male_raw <- raw_offspring[males]
     male_int <- floor(male_raw)
     male_frac <- male_raw - male_int
-    
-    # Add extra offspring to males with highest fractional parts
-    n_extra_males <- N/2 - sum(male_int)
-    if(n_extra_males > 0) {
-      top_males <- order(male_frac, decreasing = TRUE)[1:min(n_extra_males, length(male_frac))]
-      male_int[top_males] <- male_int[top_males] + 1
+    male_oc <- Candidate$oc[males]
+    male_bv <- if (has_bv) Candidate$BV[males] else rep(0, sum(males))
+
+    need <- as.integer(N/2 - sum(male_int))
+    if(need > 0) {
+      ord <- order(male_frac, male_oc, male_bv, decreasing = TRUE)
+      idx <- ord[seq_len(min(need, length(ord)))]
+      male_int[idx] <- male_int[idx] + 1
     }
     nOff[males] <- male_int
   }
-  
+
   if(sum(females) > 0) {
     female_raw <- raw_offspring[females]
     female_int <- floor(female_raw)
     female_frac <- female_raw - female_int
-    
-    # Add extra offspring to females with highest fractional parts
-    n_extra_females <- N/2 - sum(female_int)
-    if(n_extra_females > 0) {
-      top_females <- order(female_frac, decreasing = TRUE)[1:min(n_extra_females, length(female_frac))]
-      female_int[top_females] <- female_int[top_females] + 1
+    female_oc <- Candidate$oc[females]
+    female_bv <- if (has_bv) Candidate$BV[females] else rep(0, sum(females))
+
+    need <- as.integer(N/2 - sum(female_int))
+    if(need > 0) {
+      ord <- order(female_frac, female_oc, female_bv, decreasing = TRUE)
+      idx <- ord[seq_len(min(need, length(ord)))]
+      female_int[idx] <- female_int[idx] + 1
     }
     nOff[females] <- female_int
   }
-  
-  result <- data.frame(
+
+  data.frame(
     Indiv = Candidate$Indiv,
     nOff = nOff
   )
-  
-  return(result)
 }
 
 #' Mate allocation algorithm
 #' Replicates optiSel::matings functionality
 custom_matings <- function(Candidate, Kin, quiet = FALSE) {
-  # Extract candidates with offspring
-  active_candidates <- Candidate %>% filter(n > 0)
-  
-  males <- active_candidates %>% filter(Sex == "male")
-  females <- active_candidates %>% filter(Sex == "female")
-  
-  if(nrow(males) == 0 || nrow(females) == 0) {
+  active_candidates <- Candidate %>% dplyr::filter(n > 0)
+
+  males <- active_candidates %>% dplyr::filter(Sex == "male")
+  females <- active_candidates %>% dplyr::filter(Sex == "female")
+
+  if (nrow(males) == 0 || nrow(females) == 0) {
     stop("❌ Need at least one male and one female with n > 0")
   }
-  
-  # Get kinship submatrix for active candidates
+
   male_ids <- males$Indiv
   female_ids <- females$Indiv
-  
+  supply <- as.integer(males$n)
+  demand <- as.integer(females$n)
+
   K_mf <- Kin[male_ids, female_ids, drop = FALSE]
-  
-  # Initialize mating list
-  matings_list <- list()
-  
-  # Track remaining matings needed
-  males_remaining <- males$n
-  females_remaining <- females$n
-  
-  # Minimum kinship mating algorithm
-  # Iteratively select minimum kinship pairs
-  iter <- 0
-  total_matings <- sum(males$n)
-  
-  while(sum(males_remaining) > 0 && sum(females_remaining) > 0) {
-    iter <- iter + 1
-    
-    # Find available pairs (those with remaining matings)
-    avail_m <- which(males_remaining > 0)
-    avail_f <- which(females_remaining > 0)
-    
-    if(length(avail_m) == 0 || length(avail_f) == 0) break
-    
-    # Get kinships for available pairs
-    K_avail <- K_mf[avail_m, avail_f, drop = FALSE]
-    
-    # Add small penalty for repeated matings to encourage diversity
-    # This mimics the alpha parameter in optiSel
-    penalty_matrix <- matrix(0, length(avail_m), length(avail_f))
-    for(i in seq_along(matings_list)) {
-      m_idx <- which(male_ids[avail_m] == matings_list[[i]]$Sire)
-      f_idx <- which(female_ids[avail_f] == matings_list[[i]]$Dam)
-      if(length(m_idx) > 0 && length(f_idx) > 0) {
-        penalty_matrix[m_idx, f_idx] <- penalty_matrix[m_idx, f_idx] + 0.001
+  costs <- as.matrix(K_mf)
+  storage.mode(costs) <- "double"
+
+  platform_tag <- tolower(R.version$platform)
+  force_greedy <- isTRUE(getOption("allomate.force_greedy_mating", FALSE))
+  detected_webr <- isTRUE(get0("is_webr", inherits = TRUE)) || grepl("emscripten|wasm", platform_tag)
+  use_greedy <- detected_webr || force_greedy
+  lp_available <- requireNamespace("lpSolve", quietly = TRUE)
+
+  announce_algorithm <- function(label) {
+    if (!quiet) cat("Mating algorithm:", label, "\n")
+  }
+
+  run_greedy <- function(info_label) {
+    announce_algorithm(info_label)
+
+    n_m <- length(supply)
+    n_f <- length(demand)
+    X <- matrix(0L, nrow = n_m, ncol = n_f)
+
+    pairs <- expand.grid(m = seq_len(n_m), f = seq_len(n_f),
+                         KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)
+    pairs$cost <- costs[cbind(pairs$m, pairs$f)]
+    pairs <- pairs[order(pairs$cost, pairs$m, pairs$f), , drop = FALSE]
+
+    remaining_supply <- supply
+    remaining_demand <- demand
+
+    for (k in seq_len(nrow(pairs))) {
+      i <- pairs$m[k]
+      j <- pairs$f[k]
+      if (remaining_supply[i] <= 0L || remaining_demand[j] <= 0L) next
+      assignable <- min(remaining_supply[i], remaining_demand[j])
+      if (assignable > 0L) {
+        X[i, j] <- X[i, j] + as.integer(assignable)
+        remaining_supply[i] <- remaining_supply[i] - assignable
+        remaining_demand[j] <- remaining_demand[j] - assignable
+        if (sum(remaining_supply) == 0L || sum(remaining_demand) == 0L) break
       }
     }
-    
-    K_adjusted <- K_avail + penalty_matrix
-    
-    # Find minimum kinship pair
-    min_idx <- which.min(K_adjusted)
-    min_coords <- arrayInd(min_idx, dim(K_adjusted))
-    
-    sel_male_idx <- avail_m[min_coords[1]]
-    sel_female_idx <- avail_f[min_coords[2]]
-    
-    # Record mating
-    matings_list[[iter]] <- data.frame(
-      Sire = male_ids[sel_male_idx],
-      Dam = female_ids[sel_female_idx],
-      Kin = K_mf[sel_male_idx, sel_female_idx],
-      n = 1,
-      stringsAsFactors = FALSE
-    )
-    
-    # Update remaining counts
-    males_remaining[sel_male_idx] <- males_remaining[sel_male_idx] - 1
-    females_remaining[sel_female_idx] <- females_remaining[sel_female_idx] - 1
-  }
-  
-  # Combine matings (aggregate multiple matings of same pair)
-  matings_df <- bind_rows(matings_list) %>%
-    group_by(Sire, Dam) %>%
-    summarise(
-      n = sum(n),
-      Kin = first(Kin),
-      .groups = "drop"
-    ) %>%
-    arrange(Kin)
-  
-  # Calculate mean inbreeding coefficient of offspring
-  mean_inbreeding <- sum(matings_df$Kin * matings_df$n) / sum(matings_df$n)
-  
-  if(!quiet) {
 
+    if (sum(remaining_supply) != 0L || sum(remaining_demand) != 0L) {
+      stop("❌ Greedy mating allocation incomplete. Check supply/demand consistency.")
+    }
+
+    idx <- which(X > 0, arr.ind = TRUE)
+    if (nrow(idx) == 0) {
+      stop("❌ No mating assignments produced.")
+    }
+
+    matings_df <- dplyr::tibble(
+      Sire = male_ids[idx[, 1]],
+      Dam = female_ids[idx[, 2]],
+      n = as.integer(X[idx]),
+      Kin = costs[idx]
+    ) %>%
+      dplyr::arrange(Kin)
+
+    mean_inbreeding <- sum(matings_df$Kin * matings_df$n) / sum(matings_df$n)
+    attr(matings_df, "objval") <- mean_inbreeding
+    attr(matings_df, "info") <- info_label
+
+    if (!quiet) {
+      cat("\n--- Mating Diagnostics ---\n")
+      cat(sprintf("Total matings: %d\n", sum(matings_df$n)))
+      cat(sprintf("Mean offspring kinship: %.5f\n", mean_inbreeding))
+      cat("--------------------------\n\n")
+    }
+
+    matings_df
   }
-  
-  # Add attributes similar to optiSel
+
+  greedy_label <- if (detected_webr) {
+    "Greedy allocation (webR, lpSolve skipped)"
+  } else if (force_greedy) {
+    "Greedy allocation (forced via option)"
+  } else {
+    "Greedy allocation (lpSolve unavailable)"
+  }
+
+  if (use_greedy || !lp_available) {
+    return(run_greedy(greedy_label))
+  }
+
+  announce_algorithm("lpSolve transportation")
+
+  sol <- tryCatch(
+    lpSolve::lp.transport(
+      cost.mat = costs,
+      direction = "min",
+      row.signs = rep("=", length(supply)),
+      row.rhs = supply,
+      col.signs = rep("=", length(demand)),
+      col.rhs = demand
+    ),
+    error = function(e) {
+      if (!quiet) {
+        cat("lpSolve error:", e$message, "\nFalling back to greedy mating.\n")
+      }
+      NULL
+    }
+  )
+
+  if (is.null(sol) || is.null(sol$status) || sol$status != 0) {
+    if (!quiet && !is.null(sol) && !is.null(sol$status) && sol$status != 0) {
+      cat("lpSolve returned non-zero status:", sol$status, "→ fallback to greedy mating.\n")
+    }
+    return(run_greedy("Greedy allocation (lpSolve failure fallback)"))
+  }
+
+  X <- matrix(sol$solution, nrow = length(supply), ncol = length(demand), byrow = TRUE)
+
+  idx <- which(X > 0, arr.ind = TRUE)
+  matings_df <- dplyr::tibble(
+    Sire = male_ids[idx[, 1]],
+    Dam = female_ids[idx[, 2]],
+    n = as.integer(X[idx]),
+    Kin = costs[idx]
+  ) %>%
+    dplyr::arrange(Kin)
+
+  mean_inbreeding <- sum(matings_df$Kin * matings_df$n) / sum(matings_df$n)
   attr(matings_df, "objval") <- mean_inbreeding
-  attr(matings_df, "info") <- "Minimum kinship mating"
-  
-  return(matings_df)
+  attr(matings_df, "info") <- "Minimum-cost transportation mating (lpSolve)"
+
+  if (!quiet) {
+    cat("\n--- Mating Diagnostics ---\n")
+    cat(sprintf("Total matings: %d\n", sum(matings_df$n)))
+    cat(sprintf("Mean offspring kinship: %.5f\n", mean_inbreeding))
+    cat("--------------------------\n\n")
+  }
+
+  matings_df
 }
 
 #' Main OCS function combining all steps

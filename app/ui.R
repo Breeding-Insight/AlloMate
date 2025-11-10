@@ -2,6 +2,13 @@ library(shiny)
 library(shinyjs)
 library(DT)
 
+# Workaround for Chromium Issue 468227 (Chrome download attribute bug)
+downloadButton <- function(...) {
+  tag <- shiny::downloadButton(...)
+  tag$attribs$download <- NULL
+  tag
+}
+
 ui <- function(request) {
   fluidPage(
     useShinyjs(),   # enables shinyjs functions
@@ -230,7 +237,7 @@ ui <- function(request) {
           var $target = $(target);
           if ($target.length) {
             $('.help-content').animate({
-              scrollTop: $target.offset().top - 100
+              scrollTop: $target.offset().top - 200
             }, 800);
           }
         });
@@ -250,8 +257,8 @@ ui <- function(request) {
       
       # Logos banner (left)
       tags$img(
-        src = "logos.png",
-        style = "width: 70%; height: auto;"
+        src = "logos2.png",
+        style = "width: 67%; height: auto;"
       )
     ),
     
@@ -264,7 +271,6 @@ ui <- function(request) {
           style = "background-color: #ffffff; border: 1px solid #dee2e6; padding: 10px; margin-bottom: 15px; border-radius: 5px;",
           h4("🚀 Getting Started"),
           htmlOutput("dynamic_guide"),
-          verbatimTextOutput("package_status_text"),
           conditionalPanel(
             condition = "output.webr_detected",
             div(
@@ -291,6 +297,7 @@ ui <- function(request) {
           
           h5("Calculate kinship matrix"),
           fileInput("pedigree_file", "Upload pedigree file", accept = ".txt"),
+          uiOutput("pedigree_status_display"),
           
           h5("Set kinship threshold"),
           numericInput("thresh", "Max kinship allowed between mates:",
@@ -318,11 +325,30 @@ ui <- function(request) {
           h4("🎯 Optimum Contribution Selection", style = "color: #856404; margin-bottom: 15px; border-bottom: 1px solid #ffeaa7; padding-bottom: 8px;"),
           p("Configure breeding objectives and constraints:", style = "color: #6c757d; font-size: 12px; margin-bottom: 15px;"),
           
+          verbatimTextOutput("package_status_text"),
+          
           h5("Breeding Objectives"),
           numericInput("inbreeding_rate", "Desired Inbreeding Rate", 
                        value = 0.05, min = 0.01, max = 0.2, step = 0.01),
           numericInput("num_offspring", "Number of Offspring", 
                        value = 100, min = 10, step = 1),
+          checkboxInput(
+            "force_greedy_mating",
+            "Use greedy mating (browser-safe)",
+            value = isTRUE(getOption("allomate.force_greedy_mating", FALSE))
+          ),
+          checkboxInput(
+            "force_qp_greedy",
+            "Bypass quadprog (heuristic contributions)",
+            value = isTRUE(getOption("allomate.force_qp_greedy", FALSE))
+          ),
+          helpText(
+            style = "color: #6c757d; font-size: 11px;",
+            strong("Greedy mating:"), " Browser-safe, near-optimal results.",
+            br(),
+            strong("Bypass quadprog:"), " ",
+            span(style = "color: #dc3545;", "⚠️ Testing only—ignores inbreeding constraints!")
+          ),
           
           actionButton("run_ocs_btn", "Run OCS", 
                        style = "margin-top: 15px; width: 100%; background-color: #856404; color: white; border: none; padding: 10px; border-radius: 5px;")
@@ -334,6 +360,14 @@ ui <- function(request) {
           p("Download all results in a single Excel file with multiple tabs:", style = "color: #6c757d; font-size: 12px; margin-bottom: 15px;"),
           downloadButton("download_all_results", "📥 Export All Results", 
                          style = "width: 100%; background-color: #28a745; color: white; border: none; padding: 10px; border-radius: 5px; margin-bottom: 10px;"),
+          
+          # File status display box
+          div(
+            style = "background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 12px; margin-bottom: 10px; border-radius: 5px;",
+            h5("📋 File Status", style = "color: #495057; margin-top: 0; margin-bottom: 10px; font-size: 14px;"),
+            htmlOutput("file_status_display")
+          ),
+          
           actionButton("view_r_code_btn", "📝 View R Code", 
                        style = "width: 100%; background-color: #17a2b8; color: white; border: none; padding: 10px; border-radius: 5px;")
         )
@@ -351,6 +385,7 @@ ui <- function(request) {
           ),
           tabPanel("Optimum Contribution Selection",
                    DTOutput("ocs_candidate_table"),
+                   uiOutput("ocs_solver_note"),
                    br(),
                    DTOutput("ocs_mating_table")
           ),
