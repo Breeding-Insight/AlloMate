@@ -211,16 +211,7 @@ format_ocs_results <- function(results) {
     n_males = sum(results$Candidate$Sex == "male"),
     n_females = sum(results$Candidate$Sex == "female"),
     n_matings = nrow(results$Mating),
-    total_offspring = {
-      total_n <- sum(results$Candidate$n)
-      if (exists("optisel_available") && optisel_available) {
-        # optiSel's noffspring returns per-parent counts (both sexes),
-        # which sum to approximately 2 * intended offspring. Display intended total.
-        as.integer(round(total_n / 2))
-      } else {
-        total_n
-      }
-    },
+    total_offspring = sum(results$Candidate$n),
     mean_kinship = if (all(is.na(kinship_values))) NA else mean(kinship_values, na.rm = TRUE),
     mean_contribution = mean(results$Candidate$oc),
     mating_info = {

@@ -258,7 +258,8 @@ custom_noffspring <- function(Candidate, N) {
 
   has_bv <- "BV" %in% names(Candidate)
 
-  raw_offspring <- N * Candidate$oc
+  # Target 2N per-parent counts (N male + N female) to mirror optiSel behaviour
+  raw_offspring <- 2 * N * Candidate$oc
 
   males <- Candidate$Sex == "male"
   females <- Candidate$Sex == "female"
@@ -272,7 +273,7 @@ custom_noffspring <- function(Candidate, N) {
     male_oc <- Candidate$oc[males]
     male_bv <- if (has_bv) Candidate$BV[males] else rep(0, sum(males))
 
-    need <- as.integer(N/2 - sum(male_int))
+    need <- as.integer(N - sum(male_int))
     if(need > 0) {
       ord <- order(male_frac, male_oc, male_bv, decreasing = TRUE)
       idx <- ord[seq_len(min(need, length(ord)))]
@@ -288,7 +289,7 @@ custom_noffspring <- function(Candidate, N) {
     female_oc <- Candidate$oc[females]
     female_bv <- if (has_bv) Candidate$BV[females] else rep(0, sum(females))
 
-    need <- as.integer(N/2 - sum(female_int))
+    need <- as.integer(N - sum(female_int))
     if(need > 0) {
       ord <- order(female_frac, female_oc, female_bv, decreasing = TRUE)
       idx <- ord[seq_len(min(need, length(ord)))]

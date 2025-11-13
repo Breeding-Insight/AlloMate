@@ -181,8 +181,8 @@ custom_noffspring <- function(Candidate, N) {
   }
   
   # Calculate raw offspring numbers
-  # Each individual contributes to N * oc offspring
-  raw_offspring <- N * Candidate$oc
+  # Target 2N per-parent counts (N male + N female) to mirror optiSel behaviour
+  raw_offspring <- 2 * N * Candidate$oc
   
   # Round while maintaining sum constraints
   males <- Candidate$Sex == "male"
@@ -197,10 +197,11 @@ custom_noffspring <- function(Candidate, N) {
     male_frac <- male_raw - male_int
     
     # Add extra offspring to males with highest fractional parts
-    n_extra_males <- N/2 - sum(male_int)
-    if(n_extra_males > 0) {
-      top_males <- order(male_frac, decreasing = TRUE)[1:min(n_extra_males, length(male_frac))]
-      male_int[top_males] <- male_int[top_males] + 1
+    need <- as.integer(N - sum(male_int))
+    if (need > 0) {
+      ord <- order(male_frac, Candidate$oc[males], if ("BV" %in% names(Candidate)) Candidate$BV[males] else 0, decreasing = TRUE)
+      idx <- ord[seq_len(min(need, length(ord)))]
+      male_int[idx] <- male_int[idx] + 1
     }
     nOff[males] <- male_int
   }
@@ -211,10 +212,11 @@ custom_noffspring <- function(Candidate, N) {
     female_frac <- female_raw - female_int
     
     # Add extra offspring to females with highest fractional parts
-    n_extra_females <- N/2 - sum(female_int)
-    if(n_extra_females > 0) {
-      top_females <- order(female_frac, decreasing = TRUE)[1:min(n_extra_females, length(female_frac))]
-      female_int[top_females] <- female_int[top_females] + 1
+    need <- as.integer(N - sum(female_int))
+    if (need > 0) {
+      ord <- order(female_frac, Candidate$oc[females], if ("BV" %in% names(Candidate)) Candidate$BV[females] else 0, decreasing = TRUE)
+      idx <- ord[seq_len(min(need, length(ord)))]
+      female_int[idx] <- female_int[idx] + 1
     }
     nOff[females] <- female_int
   }
