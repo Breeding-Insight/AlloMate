@@ -187,12 +187,16 @@ format_ocs_results <- function(results) {
     mating_df$Kinship <- NA
   }
   
-  mating_table <- tryCatch({
-    mating_df %>% mutate(across(everything(), as.character))
-  }, error = function(e) {
-    # Fallback: convert to data frame and then to character
-    as.data.frame(lapply(mating_df, as.character), stringsAsFactors = FALSE)
-  })
+  # Ensure numeric columns remain numeric (n and Kinship should be numeric for export)
+  # Rename n to a more descriptive name for export
+  mating_table <- mating_df %>%
+    mutate(
+      # Keep n as integer/numeric
+      n = as.integer(n),
+      # Keep Kinship as numeric
+      Kinship = as.numeric(Kinship)
+    ) %>%
+    rename(`# Matings` = n)
   
   # Calculate summary statistics - handle different kinship column names
   kinship_values <- NA
