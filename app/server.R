@@ -8,6 +8,11 @@
 
 server <- function(input, output, session) {
   
+  missing_id_data <- reactiveValues(
+    candidates = character(),
+    ebvs = character()
+  )
+  
   # Package status output
   output$package_status_text <- renderText({
     generate_package_status()
@@ -23,6 +28,25 @@ server <- function(input, output, session) {
   })
   outputOptions(output, "webr_detected", suspendWhenHidden = FALSE)
   
+  ocs_checkboxes_enabled <- isTRUE(is_webr_environment()) &&
+    !isTRUE(get0("optisel_available", inherits = TRUE, ifnotfound = FALSE))
+  
+  output$ocs_checkbox_mode <- renderText({
+    if (ocs_checkboxes_enabled) {
+      "1"
+    } else {
+      ""
+    }
+  })
+  outputOptions(output, "ocs_checkbox_mode", suspendWhenHidden = FALSE)
+  
+  if (!ocs_checkboxes_enabled) {
+    options(
+      allomate.force_greedy_mating = FALSE,
+      allomate.force_qp_greedy = FALSE
+    )
+  }
+  
   # Help button functionality
   observeEvent(input$help_btn, {
     updateTabsetPanel(session, "main_tabs", selected = "Help")
@@ -36,6 +60,13 @@ server <- function(input, output, session) {
   # Back to top functionality
   observeEvent(input$back_to_top, {
     runjs("document.querySelector('.help-content').scrollTop = 0;")
+  })
+  
+  observeEvent(input$ocs_help_anchor, {
+    anchor <- input$ocs_help_anchor$anchor
+    req(anchor)
+    updateTabsetPanel(session, "main_tabs", selected = "Help")
+    session$sendCustomMessage("ocs-scroll", list(anchor = anchor))
   })
   
   # Enhanced markdown to HTML conversion function
@@ -270,6 +301,9 @@ server <- function(input, output, session) {
   ebv_results_reactive <- reactiveVal()  # For EBV results
   error_message <- reactiveVal("")  # For tracking errors
   pedigree_validation_stats <- reactiveVal(NULL)
+  ebv_data <- reactive({
+    process_ebvs(trait_counter(), input)
+  })
   
   # Export: Prebuild workbook so Chrome downloads reliably
   export_cache <- reactiveVal(NULL)
@@ -762,10 +796,15 @@ server <- function(input, output, session) {
       # Check for candidates missing from pedigree
       candidate_ids <- candidates_data()$candidates$id
       pedigree_ids <- as.character(raw_ped$id)
-      missing_candidates <- sum(!candidate_ids %in% pedigree_ids)
+      missing_candidate_ids <- setdiff(candidate_ids, pedigree_ids)
+      missing_candidates <- length(missing_candidate_ids)
+      missing_male_ids <- intersect(missing_candidate_ids, males)
+      missing_female_ids <- intersect(missing_candidate_ids, females)
+      remaining_missing_ids <- setdiff(missing_candidate_ids, c(missing_male_ids, missing_female_ids))
       
-      # Add missing candidates count to stats
+      # Add missing candidates counts to stats
       cleaned_ped$stats$missing_candidates <- missing_candidates
+      cleaned_ped$stats$missing_candidate_ids <- missing_candidate_ids
       
       kinship_res <- compute_kinship_matrix(final_ped, males, females)
       
@@ -780,7 +819,39 @@ server <- function(input, output, session) {
       pedigree_validation_stats(cleaned_ped$stats)
       
       error_message("")  # Clear any previous errors
-      output$message1 <- renderText("✅ Kinship matrix generated successfully.")
+      
+      format_missing_msg <- function(ids, label) {
+        if (length(ids) == 0) {
+          return(NULL)
+        }
+        ids_str <- format_id_list(ids)
+        plural <- if (length(ids) == 1) "" else "s"
+        if (ids_str != "") {
+          paste0(length(ids), " ", label, plural,
+                 " missing from pedigree and not visualized (IDs: ", ids_str, ").")
+        } else {
+          paste0(length(ids), " ", label, plural,
+                 " missing from pedigree and not visualized.")
+        }
+      }
+      
+      kinship_mismatch_msgs <- Filter(Negate(is.null), list(
+        format_missing_msg(missing_male_ids, "male candidate"),
+        format_missing_msg(missing_female_ids, "female candidate"),
+        format_missing_msg(remaining_missing_ids, "candidate")
+      ))
+      kinship_mismatch_msgs <- unlist(kinship_mismatch_msgs)
+      
+      kinship_status <- if (length(kinship_mismatch_msgs) == 0) {
+        "✅ Kinship matrix generated successfully."
+      } else {
+        paste(
+          "⚠️ Kinship matrix generated with warnings.",
+          paste(kinship_mismatch_msgs, collapse = " ")
+        )
+      }
+      
+      output$message1 <- renderText(kinship_status)
     }, error = function(e) {
       error_message(paste0("Error processing pedigree: ", e$message))
       pedigree_validation_stats(NULL)
@@ -792,8 +863,26 @@ server <- function(input, output, session) {
   })
   
   observe({
+    if (is.null(ebv_data())) {
+      output$message2 <- renderUI(NULL)
+      output$candidate_ebv_status <- renderUI(NULL)
+    }
+  })
+  
+  output$ebv_upload_prompt <- renderUI({
+    if (!is.null(pedigree_data()) && is.null(ebv_data())) {
+      tags$pre(
+        class = "shiny-text-output",
+        "⬜️ Please upload trait EBVs."
+      )
+    } else {
+      NULL
+    }
+  })
+  
+  observe({
     req(candidates_data())
-    ebv_res <- process_ebvs(trait_counter(), input)
+    ebv_res <- ebv_data()
     req(ebv_res)
     
     joint_ebvs <- ebv_res$joint_ebvs
@@ -809,23 +898,78 @@ server <- function(input, output, session) {
     males <- candidates_data()$males
     females <- candidates_data()$females
     
-    cand_ebv <- left_join(cands, joint_ebvs, by = c("id" = "ID")) %>%
+    ebv_ids <- unique(joint_ebvs$ID)
+    ebv_only_ids <- setdiff(ebv_ids, cands$id)
+    joint_ebvs_filtered <- joint_ebvs %>%
+      filter(ID %in% cands$id)
+    
+    cand_ebv <- left_join(cands, joint_ebvs_filtered, by = c("id" = "ID")) %>%
       select(id, sex, index_val)
     
-    m_ebv <- filter(cand_ebv, id %in% males) %>% select(id, index_val)
-    f_ebv <- filter(cand_ebv, id %in% females) %>% select(id, index_val)
+    candidate_missing_ids <- cand_ebv %>%
+      filter(is.na(index_val)) %>%
+      pull(id)
     
-    ebv_matrix <- outer(m_ebv$index_val, f_ebv$index_val, function(x, y) round((x + y) / 2, 2))
-    rownames(ebv_matrix) <- m_ebv$id
-    colnames(ebv_matrix) <- f_ebv$id
+    missing_id_data$candidates <- candidate_missing_ids
+    missing_id_data$ebvs <- ebv_only_ids
     
-    ebv_quads <- tibble(
-      Data = "EBV",
-      Q25 = quantile(ebv_matrix, 0.25),
-      Q50 = quantile(ebv_matrix, 0.50),
-      Q75 = quantile(ebv_matrix, 0.75),
-      Q100 = quantile(ebv_matrix, 1.00)
-    ) %>% column_to_rownames("Data")
+    m_ebv <- cand_ebv %>%
+      filter(id %in% males, !is.na(index_val)) %>%
+      select(id, index_val)
+    f_ebv <- cand_ebv %>%
+      filter(id %in% females, !is.na(index_val)) %>%
+      select(id, index_val)
+    
+    valid_pairs <- nrow(m_ebv) > 0 && nrow(f_ebv) > 0
+    
+    if (valid_pairs) {
+      ebv_matrix <- outer(m_ebv$index_val, f_ebv$index_val, function(x, y) round((x + y) / 2, 2))
+      rownames(ebv_matrix) <- m_ebv$id
+      colnames(ebv_matrix) <- f_ebv$id
+      
+      ebv_quads <- tibble(
+        Data = "EBV",
+        Q25 = quantile(ebv_matrix, 0.25, na.rm = TRUE),
+        Q50 = quantile(ebv_matrix, 0.50, na.rm = TRUE),
+        Q75 = quantile(ebv_matrix, 0.75, na.rm = TRUE),
+        Q100 = quantile(ebv_matrix, 1.00, na.rm = TRUE)
+      ) %>% column_to_rownames("Data")
+      
+      ebv_results <- as_tibble(ebv_matrix, rownames = "Male") %>%
+        pivot_longer(-Male, names_to = "Female", values_to = "EBV")
+      
+      full_results <- if (!is.null(pedigree_data())) {
+        left_join(pedigree_data()$results, ebv_results, by = c("Female", "Male"))
+      } else {
+        relocate(mutate(ebv_results, Kinship = NA), Kinship, .after = EBV)
+      }
+    } else {
+      ebv_quads <- tibble(
+        Data = "EBV",
+        Q25 = NA_real_,
+        Q50 = NA_real_,
+        Q75 = NA_real_,
+        Q100 = NA_real_
+      ) %>% column_to_rownames("Data")
+      
+      if (!is.null(pedigree_data())) {
+        full_results <- pedigree_data()$results %>%
+          mutate(EBV = NA_real_)
+      } else {
+        full_results <- tibble(
+          Male = character(),
+          Female = character(),
+          Kinship = numeric(),
+          EBV = numeric()
+        )
+      }
+      
+      ebv_results <- tibble(
+        Male = character(),
+        Female = character(),
+        EBV = numeric()
+      )
+    }
     
     quads_combined <- if (!is.null(pedigree_data())) {
       bind_rows(pedigree_data()$quads, ebv_quads)
@@ -841,16 +985,7 @@ server <- function(input, output, session) {
         formatStyle("Q100", backgroundColor = "lightgreen")
     })
     
-    ebv_results <- as_tibble(ebv_matrix, rownames = "Male") %>%
-      pivot_longer(-Male, names_to = "Female", values_to = "EBV")
-    
-    full_results <- if (!is.null(pedigree_data())) {
-      left_join(pedigree_data()$results, ebv_results, by = c("Female", "Male"))
-    } else {
-      relocate(mutate(ebv_results, Kinship = NA), Kinship, .after = EBV)
-    }
-    
-    # For table: filter out crosses with EBV <=0 or kinship >= threshold
+    # Filter out crosses with EBV <= 0 or kinship >= threshold
     filt_results_table <- full_results %>%
       filter(EBV > 0, (is.na(Kinship) | Kinship < input$thresh))
     
@@ -867,30 +1002,120 @@ server <- function(input, output, session) {
     ))
     
     output$matrix <- DT::renderDT({
-      datatable(filt_results_table, rownames = TRUE) %>%
-        formatStyle("EBV", styleInterval(
-          unlist(ebv_quads[1, c("Q25", "Q50", "Q75")]),
-          c("coral", "orange", "yellow", "lightgreen")
-        ))
+      dt <- datatable(filt_results_table, rownames = TRUE)
+      if (valid_pairs && nrow(filt_results_table) > 0) {
+        dt <- dt %>%
+          formatStyle("EBV", styleInterval(
+            unlist(ebv_quads[1, c("Q25", "Q50", "Q75")]),
+            c("coral", "orange", "yellow", "lightgreen")
+          ))
+      }
+      dt
     })
     
-    output$message2 <- renderText(
-      if (abs(weight_total - 1) > 1e-6)
-        paste("⚠️ Warning: Trait weights do not sum to 1 (total =", round(weight_total, 4), ")")
-      else
-        "✅ EBV matrix generated successfully."
+    status_components <- list()
+    
+    total_candidates <- dplyr::n_distinct(cands$id)
+    total_ebvs <- length(ebv_ids)
+    candidate_match_ui <- NULL
+    if (total_candidates > 0 &&
+        length(candidate_missing_ids) == 0 &&
+        total_ebvs >= total_candidates) {
+      candidate_match_ui <- tags$pre(
+        class = "shiny-text-output",
+        "✅ All selection candidates have corresponding EBVs"
+      )
+    }
+    
+    output$candidate_ebv_status <- renderUI(candidate_match_ui)
+    
+    if (length(candidate_missing_ids) > 0) {
+      display_ids <- head(candidate_missing_ids, 3)
+      extra_count <- length(candidate_missing_ids) - length(display_ids)
+      display_str <- paste(display_ids, collapse = ", ")
+      candidate_text <- paste0("Candidates lack corresponding EBVs: ", display_str)
+      if (extra_count > 0) {
+        candidate_text <- paste0(candidate_text, " and ", extra_count, " more")
+      }
+      candidate_text <- paste0(candidate_text, " will be excluded from further analysis, ")
+      
+      status_components <- append(status_components, list(
+        tags$p(
+          "❗",
+          candidate_text,
+          downloadLink("download_missing_candidates", "view here"),
+          "."
+        )
+      ))
+    }
+    
+    if (length(ebv_only_ids) > 0) {
+      status_components <- append(status_components, list(
+        tags$p(
+          sprintf("🗂️ EBVs filtered for matching candidates: %d EBVs removed.", length(ebv_only_ids))
+        )
+      ))
+    }
+
+    if (!valid_pairs) {
+      status_components <- append(status_components, list(
+        tags$p("❌ EBV matrix not visualized because no overlapping candidates with EBVs remain.")
+      ))
+    }
+    
+    if (abs(weight_total - 1) > 1e-6) {
+      status_components <- append(status_components, list(
+        tags$p(
+          paste("⚠️ Warning: Trait weights do not sum to 1 (total =", round(weight_total, 4), ")")
+        )
+      ))
+    }
+    
+    status_body <- if (length(status_components) == 0) {
+      tags$p("✅ EBV matrix generated successfully.")
+    } else {
+      do.call(tagList, status_components)
+    }
+    
+    status_ui <- tags$div(
+      style = "background-color: #f0f0f0; border: 1px solid #d0d0d0; padding: 12px; border-radius: 6px; margin-top: 10px;",
+      tags$h5("ℹ️ Candidate-EBV Mapping Summary", style = "margin-top: 0; font-weight: 600;"),
+      status_body
     )
+    
+    output$message2 <- renderUI(status_ui)
     
     # download handler defined at top-level above
   })
   
+  output$download_missing_candidates <- downloadHandler(
+    filename = function() {
+      paste0("candidates_missing_ebvs_", Sys.Date(), ".txt")
+    },
+    content = function(file) {
+      ids <- missing_id_data$candidates
+      lines <- if (length(ids) == 0) {
+        c("Candidates lacking EBVs:", "None.")
+      } else {
+        c("Candidates lacking EBVs:", ids)
+      }
+      writeLines(lines, con = file)
+    }
+  )
+  
   #### OCS Server Logic ####
   
   observeEvent(input$force_greedy_mating, {
+    if (!ocs_checkboxes_enabled) {
+      return(NULL)
+    }
     options(allomate.force_greedy_mating = isTRUE(input$force_greedy_mating))
   }, ignoreNULL = FALSE)
   
   observeEvent(input$force_qp_greedy, {
+    if (!ocs_checkboxes_enabled) {
+      return(NULL)
+    }
     options(allomate.force_qp_greedy = isTRUE(input$force_qp_greedy))
   }, ignoreNULL = FALSE)
   
@@ -909,12 +1134,21 @@ server <- function(input, output, session) {
       return(NULL)
     }
     
-    options(allomate.force_greedy_mating = isTRUE(input$force_greedy_mating))
-    options(allomate.force_qp_greedy = isTRUE(input$force_qp_greedy))
+    if (ocs_checkboxes_enabled) {
+      options(allomate.force_greedy_mating = isTRUE(input$force_greedy_mating))
+      options(allomate.force_qp_greedy = isTRUE(input$force_qp_greedy))
+    } else {
+      options(allomate.force_greedy_mating = FALSE)
+      options(allomate.force_qp_greedy = FALSE)
+    }
+    
+    # Show OCS loading spinner for the duration of the analysis
+    shinyjs::show("ocs_loading")
+    on.exit(shinyjs::hide("ocs_loading"), add = TRUE)
     
     tryCatch({
-      ped_data <- read.table(input$pedigree_file$datapath, header = TRUE)
-      candidates <- read.table(input$candidate_file$datapath, header = TRUE)
+      ped_data <- read.table(input$pedigree_file$datapath, header = TRUE, stringsAsFactors = FALSE)
+      candidates <- read.table(input$candidate_file$datapath, header = TRUE, stringsAsFactors = FALSE)
       
       final_ped <- clean_pedigree(ped_data)
       kinship_matrix <- if (exists("kinship2_available") && kinship2_available) {
@@ -934,18 +1168,58 @@ server <- function(input, output, session) {
       }
       
       joint_ebvs <- calculate_index(ebv_result$joint_ebvs, ebv_result$rel_weights)
-      candidates <- left_join(candidates, joint_ebvs, by = c("id" = "ID"))
+      joint_ebvs_ids <- unique(joint_ebvs$ID)
+      ebv_only_ids <- setdiff(joint_ebvs_ids, candidates$id)
+      joint_ebvs_filtered <- joint_ebvs %>% filter(ID %in% candidates$id)
       
-      # Set seed for reproducibility when testing optiSel vs fallback
-      set.seed(42)
+      candidates_joined <- left_join(candidates, joint_ebvs_filtered, by = c("id" = "ID"))
+      missing_candidate_ids <- candidates_joined %>%
+        filter(is.na(index_val)) %>%
+        pull(id)
+      
+      if (length(missing_candidate_ids) > 0) {
+        display_ids <- head(missing_candidate_ids, 3)
+        extra_count <- length(missing_candidate_ids) - length(display_ids)
+        warning_msg <- paste0(
+          "OCS: Removed ", length(missing_candidate_ids),
+          " candidate(s) lacking EBVs (IDs: ",
+          paste(display_ids, collapse = ", ")
+        )
+        if (extra_count > 0) {
+          warning_msg <- paste0(warning_msg, " and ", extra_count, " more")
+        }
+        warning_msg <- paste0(warning_msg, ").")
+        showNotification(warning_msg, type = "warning", duration = 8)
+      }
+      
+      if (length(ebv_only_ids) > 0) {
+        showNotification("OCS: EBV records without candidates were ignored.", type = "warning", duration = 8)
+      }
+      
+      candidates_filtered <- candidates_joined %>% filter(!is.na(index_val))
+      
+      if (nrow(candidates_filtered) == 0) {
+        stop("❌ No candidates with EBVs available for OCS. Please ensure at least one candidate of each sex has an EBV.")
+      }
       
       results <- run_ocs(
-        candidates_df = candidates,
+        candidates_df = candidates_filtered,
         kinship_matrix = kinship_matrix,
-        ebv_index = candidates$index_val,
+        ebv_index = candidates_filtered$index_val,
         desired_inbreeding_rate = input$inbreeding_rate,
-        num_offspring = input$num_offspring
+        num_offspring = input$num_offspring,
+        per_pair_kinship_limit = if (ocs_checkboxes_enabled && isTRUE(input$enforce_pair_kinship)) input$inbreeding_rate else NULL
       )
+      
+      mating_info <- attr(results$Mating, "info")
+      if (!is.null(mating_info) && is.character(mating_info) &&
+          grepl("Greedy allocation", mating_info, fixed = TRUE)) {
+        showNotification(
+          paste0("OCS fallback: ", mating_info, ". lpSolve solution could not be used, so a greedy mating plan was generated."),
+          type = "warning",
+          duration = 10
+        )
+      }
       
       ocs_results_reactive(results)
       
@@ -955,7 +1229,11 @@ server <- function(input, output, session) {
       formatted_results <- format_ocs_results(results)
       
       output$ocs_candidate_table <- DT::renderDT({
-        formatted_results$candidate_table
+        DT::datatable(
+          formatted_results$candidate_table,
+          options = list(pageLength = 10, autoWidth = TRUE),
+          rownames = FALSE
+        )
       })
       
       # Switch to OCS tab to show results
@@ -975,7 +1253,15 @@ server <- function(input, output, session) {
     req(ocs_results_reactive())
     results <- ocs_results_reactive()
     formatted_results <- format_ocs_results(results)
-    formatted_results$mating_table %>%
+    mating_tbl <- formatted_results$mating_table
+  
+    # Optionally enforce per-pair kinship threshold for display
+    if (ocs_checkboxes_enabled && isTRUE(input$enforce_pair_kinship)) {
+      mating_tbl <- mating_tbl %>%
+        dplyr::filter(is.na(Kinship) | Kinship < input$inbreeding_rate)
+    }
+  
+    mating_tbl %>%
       datatable(
         options = list(pageLength = 10, autoWidth = TRUE),
         rownames = FALSE

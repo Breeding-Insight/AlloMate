@@ -224,6 +224,35 @@ ui <- function(request) {
         .r-code-content .setup-instructions ul {
           margin-bottom: 0;
         }
+        
+        /* OCS loading spinner */
+        .ocs-spinner {
+          border: 8px solid #f3f3f3;
+          border-top: 8px solid #ffc107;
+          border-radius: 50%;
+          width: 60px;
+          height: 60px;
+          animation: ocs-spin 1s linear infinite;
+        }
+        
+        @keyframes ocs-spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        
+        .ocs-help-link {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          margin-left: 6px;
+          font-size: 0.9em;
+          text-decoration: none;
+          cursor: pointer;
+        }
+        
+        .ocs-help-link:hover {
+          text-decoration: underline;
+        }
       "))
     ),
     
@@ -241,6 +270,19 @@ ui <- function(request) {
             }, 800);
           }
         });
+      });
+      
+      Shiny.addCustomMessageHandler('ocs-scroll', function(message) {
+        var anchor = message && message.anchor;
+        if (!anchor) {
+          return;
+        }
+        setTimeout(function() {
+          var target = document.getElementById(anchor);
+          if (target && target.scrollIntoView) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 300);
       });
     ")),
     
@@ -332,22 +374,50 @@ ui <- function(request) {
                        value = 0.05, min = 0.01, max = 0.2, step = 0.01),
           numericInput("num_offspring", "Number of Offspring", 
                        value = 100, min = 10, step = 1),
-          checkboxInput(
-            "force_greedy_mating",
-            "Use greedy mating (browser-safe)",
-            value = isTRUE(getOption("allomate.force_greedy_mating", FALSE))
-          ),
-          checkboxInput(
-            "force_qp_greedy",
-            "Bypass quadprog (heuristic contributions)",
-            value = isTRUE(getOption("allomate.force_qp_greedy", FALSE))
-          ),
-          helpText(
-            style = "color: #6c757d; font-size: 11px;",
-            strong("Greedy mating:"), " Browser-safe, near-optimal results.",
-            br(),
-            strong("Bypass quadprog:"), " ",
-            span(style = "color: #dc3545;", "⚠️ Testing only—ignores inbreeding constraints!")
+          conditionalPanel(
+            condition = "output.ocs_checkbox_mode == '1'",
+            checkboxInput(
+              "enforce_pair_kinship",
+              tagList(
+                "Enforce per-pair kinship threshold in mating plan",
+                tags$a(
+                  "\u2753",
+                  href = "#",
+                  title = "Open help: Enforce Per-Pair Kinship Threshold",
+                  class = "ocs-help-link",
+                  onclick = "Shiny.setInputValue('ocs_help_anchor', {anchor: '-enforce-perpair-kinship-threshold', nonce: Math.random()}, {priority: 'event'}); return false;"
+                )
+              ),
+              value = TRUE
+            ),
+            checkboxInput(
+              "force_greedy_mating",
+              tagList(
+                "Use greedy mating (browser-safe)",
+                tags$a(
+                  "\u2753",
+                  href = "#",
+                  title = "Open help: Use Greedy Mating (Browser-Safe)",
+                  class = "ocs-help-link",
+                  onclick = "Shiny.setInputValue('ocs_help_anchor', {anchor: '-use-greedy-mating-browsersafe', nonce: Math.random()}, {priority: 'event'}); return false;"
+                )
+              ),
+              value = isTRUE(getOption("allomate.force_greedy_mating", FALSE))
+            ),
+            checkboxInput(
+              "force_qp_greedy",
+              tagList(
+                "Bypass quadprog (heuristic contributions)",
+                tags$a(
+                  "\u2753",
+                  href = "#",
+                  title = "Open help: Bypass Quadprog (Heuristic Contributions)",
+                  class = "ocs-help-link",
+                  onclick = "Shiny.setInputValue('ocs_help_anchor', {anchor: '-bypass-quadprog-heuristic-contributions', nonce: Math.random()}, {priority: 'event'}); return false;"
+                )
+              ),
+              value = isTRUE(getOption("allomate.force_qp_greedy", FALSE))
+            )
           ),
           
           actionButton("run_ocs_btn", "Run OCS", 
@@ -377,17 +447,31 @@ ui <- function(request) {
           id = "main_tabs",
           tabPanel("Kinship and EBV",
                    verbatimTextOutput("message1"),
+                   uiOutput("candidate_ebv_status"),
+                   uiOutput("ebv_upload_prompt"),
                    
-                   verbatimTextOutput("message2"),
+                   uiOutput("message2"),
                    
                    DTOutput("quadrants_table"),
                    DTOutput("matrix")
           ),
           tabPanel("Optimum Contribution Selection",
-                   DTOutput("ocs_candidate_table"),
-                   uiOutput("ocs_solver_note"),
-                   br(),
-                   DTOutput("ocs_mating_table")
+                   div(
+                     id = "ocs_container",
+                     style = "position: relative;",
+                     div(
+                       id = "ocs_loading",
+                       style = "display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255,255,255,0.8); z-index: 9999;",
+                       div(
+                         style = "position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%);",
+                         div(class = "ocs-spinner")
+                       )
+                     ),
+                     DTOutput("ocs_candidate_table"),
+                     uiOutput("ocs_solver_note"),
+                     br(),
+                     DTOutput("ocs_mating_table")
+                   )
           ),
           tabPanel("R Code",
                    div(

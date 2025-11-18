@@ -7,8 +7,14 @@
 #' @param ebv_index Vector of breeding value indices
 #' @param desired_inbreeding_rate Target inbreeding rate constraint
 #' @param num_offspring Number of offspring to allocate
+#' @param per_pair_kinship_limit Optional maximum kinship allowed for any mating pair
 #' @return List with Candidate and Mating results
-run_ocs <- function(candidates_df, kinship_matrix, ebv_index, desired_inbreeding_rate, num_offspring) {
+run_ocs <- function(candidates_df,
+                    kinship_matrix,
+                    ebv_index,
+                    desired_inbreeding_rate,
+                    num_offspring,
+                    per_pair_kinship_limit = NULL) {
   using_optisel <- isTRUE(get0("optisel_available", inherits = TRUE)) &&
     requireNamespace("optiSel", quietly = TRUE)
   using_fallback <- isTRUE(get0("custom_ocs_available", inherits = TRUE)) && !using_optisel
@@ -71,6 +77,14 @@ run_ocs <- function(candidates_df, kinship_matrix, ebv_index, desired_inbreeding
                 "Try increasing the inbreeding rate threshold (e.g., 0.10 or higher) or reducing the number of offspring."))
   }
   
+  if (!is.null(per_pair_kinship_limit)) {
+    if (!is.numeric(per_pair_kinship_limit) || length(per_pair_kinship_limit) != 1 ||
+        is.na(per_pair_kinship_limit) || per_pair_kinship_limit <= 0 ||
+        per_pair_kinship_limit >= 1) {
+      stop("❌ Per-pair kinship limit must be a numeric value between 0 and 1.")
+    }
+  }
+
   # Safe to call noffspring now that Candidate has valid data
   Candidate$n <- if (using_optisel) {
     optiSel::noffspring(Candidate, num_offspring)$nOff
@@ -82,28 +96,128 @@ run_ocs <- function(candidates_df, kinship_matrix, ebv_index, desired_inbreeding
     stop("❌ OCS resulted in only one sex being selected. Cannot generate mating pairs.")
   }
   
-  # For real optiSel package, subset kinship matrix to match selected candidates
-  if (using_optisel) {
-    selected_ids <- Candidate$Indiv
-    sKin_subset <- sKin[selected_ids, selected_ids, drop = FALSE]
+  selected_ids <- Candidate$Indiv
+  sKin_subset <- sKin[selected_ids, selected_ids, drop = FALSE]
+
+  should_use_custom_matings <- !is.null(per_pair_kinship_limit) || !using_optisel
+
+  if (!should_use_custom_matings) {
     Mating <- optiSel::matings(Candidate, Kin = sKin_subset)
-    
-    # optiSel doesn't include kinship values in mating results, so add them manually
     if (nrow(Mating) > 0 && !"Kin" %in% names(Mating)) {
       Mating$Kin <- vapply(
         seq_len(nrow(Mating)),
         function(i) {
           sire <- Mating$Sire[i]
           dam <- Mating$Dam[i]
-          sKin[sire, dam]
+          sKin_subset[sire, dam]
         },
         numeric(1)
       )
     }
   } else {
-    Mating <- custom_matings(Candidate, Kin = sKin)
+    Mating <- custom_matings(
+      Candidate,
+      Kin = sKin_subset,
+      max_pair_kinship = per_pair_kinship_limit
+    )
   }
+
+  if (nrow(Mating) == 0) {
+    stop("❌ No feasible mating plan could be generated under the chosen settings. Try increasing the per-pair kinship limit or adjusting offspring counts.")
+  }
+
+  validate_mating_consistency(Candidate, Mating)
+
   list(Candidate = Candidate, Mating = Mating)
+}
+
+#' Reconcile offspring counts with realized matings
+#' @param Candidate Candidate data frame with n column from noffspring
+#' @param Mating Mating plan containing Sire, Dam, and n columns
+reconcile_offspring_with_matings <- function(Candidate, Mating) {
+  if (nrow(Mating) == 0) {
+    Candidate$n <- 0
+    return(Candidate[0, ])
+  }
+
+  if (!all(c("Sire", "Dam", "n") %in% names(Mating))) {
+    stop("❌ Mating plan is missing required columns (Sire, Dam, n).")
+  }
+
+  male_totals <- tapply(Mating$n, Mating$Sire, sum)
+  female_totals <- tapply(Mating$n, Mating$Dam, sum)
+
+  Candidate$n <- ifelse(
+    Candidate$Sex == "male",
+    male_totals[Candidate$Indiv],
+    female_totals[Candidate$Indiv]
+  )
+  Candidate$n[is.na(Candidate$n)] <- 0
+  dplyr::filter(Candidate, n > 0)
+}
+
+#' Validate that mating plan matches expected offspring targets
+#' @param Candidate Candidate data frame with target n column from noffspring
+#' @param Mating Mating plan containing Sire, Dam, and n columns
+validate_mating_consistency <- function(Candidate, Mating) {
+  if (nrow(Mating) == 0) {
+    stop("❌ No matings available to validate.")
+  }
+
+  required_cols <- c("Sire", "Dam", "n")
+  if (!all(required_cols %in% names(Mating))) {
+    stop("❌ Mating plan is missing required columns (Sire, Dam, n).")
+  }
+
+  if (!"n" %in% names(Candidate)) {
+    stop("❌ Candidate table is missing target offspring counts (n).")
+  }
+
+  male_idx <- Candidate$Sex == "male"
+  female_idx <- Candidate$Sex == "female"
+
+  expected_males <- setNames(Candidate$n[male_idx], Candidate$Indiv[male_idx])
+  expected_females <- setNames(Candidate$n[female_idx], Candidate$Indiv[female_idx])
+
+  actual_males <- tapply(Mating$n, Mating$Sire, sum)
+  actual_females <- tapply(Mating$n, Mating$Dam, sum)
+
+  if (is.null(actual_males)) {
+    actual_males <- setNames(numeric(0), character(0))
+  }
+  if (is.null(actual_females)) {
+    actual_females <- setNames(numeric(0), character(0))
+  }
+
+  check_counts <- function(expected_vec, actual_vec, label) {
+    if (length(expected_vec) == 0) {
+      return()
+    }
+    aligned_actual <- actual_vec[names(expected_vec)]
+    if (length(aligned_actual) == 0 && length(expected_vec) > 0) {
+      aligned_actual <- rep(0, length(expected_vec))
+      names(aligned_actual) <- names(expected_vec)
+    } else {
+      names(aligned_actual) <- names(expected_vec)
+      aligned_actual[is.na(aligned_actual)] <- 0
+    }
+    mismatches <- names(expected_vec)[aligned_actual != expected_vec]
+    if (length(mismatches) > 0) {
+      details <- paste(
+        sprintf("%s: expected %d, got %d",
+                mismatches,
+                expected_vec[mismatches],
+                aligned_actual[mismatches]),
+        collapse = "; "
+      )
+      stop(sprintf("❌ %s mating plan inconsistent with target offspring counts (%s).", label, details))
+    }
+  }
+
+  check_counts(expected_males, actual_males, "Male")
+  check_counts(expected_females, actual_females, "Female")
+
+  invisible(TRUE)
 }
 
 #' Validate OCS inputs before running analysis
@@ -187,6 +301,14 @@ format_ocs_results <- function(results) {
     mating_df$Kinship <- NA
   }
   
+  # Estimate expected EBV for each mating pair by averaging parent EBVs
+  bv_lookup <- results$Candidate %>%
+    dplyr::select(Indiv, BV)
+  sire_bv <- bv_lookup$BV[match(mating_df$Male, bv_lookup$Indiv)]
+  dam_bv <- bv_lookup$BV[match(mating_df$Female, bv_lookup$Indiv)]
+  expected_bv <- rowMeans(cbind(sire_bv, dam_bv), na.rm = TRUE)
+  expected_bv[is.nan(expected_bv)] <- NA_real_
+  
   # Ensure numeric columns remain numeric (n and Kinship should be numeric for export)
   # Rename n to a more descriptive name for export
   mating_table <- mating_df %>%
@@ -196,7 +318,9 @@ format_ocs_results <- function(results) {
       # Keep Kinship as numeric
       Kinship = as.numeric(Kinship)
     ) %>%
-    rename(`# Matings` = n)
+    rename(`# Matings` = n) %>%
+    mutate(`Expected EBV` = round(expected_bv, 3)) %>%
+    select(Male, Female, Kinship, `# Matings`, `Expected EBV`)
   
   # Calculate summary statistics - handle different kinship column names
   kinship_values <- NA
@@ -240,8 +364,9 @@ reset_ocs_runtime <- function() {
 #' Create Excel workbook with OCS results
 #' @param results OCS results list
 #' @param params OCS parameters used
+#' @param kinship_threshold Optional per-pair kinship threshold for filtering matings
 #' @return Workbook object ready for saving
-create_ocs_workbook <- function(results, params = NULL) {
+create_ocs_workbook <- function(results, params = NULL, kinship_threshold = NULL) {
   wb <- openxlsx::createWorkbook()
   
   # Add README sheet
@@ -295,19 +420,25 @@ create_ocs_workbook <- function(results, params = NULL) {
     mating_export$Kinship <- NA
   }
   
+  # Optionally enforce per-pair kinship threshold before export
+  if (!is.null(kinship_threshold)) {
+    mating_export <- mating_export %>%
+      dplyr::filter(is.na(Kinship) | Kinship < kinship_threshold)
+  }
+
   # Select and rename columns based on what's available
   if (all(c("Sire", "Dam") %in% names(mating_export))) {
     mating_df <- mating_export %>%
-      select(Sire, Dam, Kinship, n) %>%
-      rename(`# Matings` = n)
+      dplyr::select(Sire, Dam, Kinship, n) %>%
+      dplyr::rename(`# Matings` = n)
   } else if (all(c("Male", "Female") %in% names(mating_export))) {
     mating_df <- mating_export %>%
-      select(Male, Female, Kinship, n) %>%
-      rename(`# Matings` = n)
+      dplyr::select(Male, Female, Kinship, n) %>%
+      dplyr::rename(`# Matings` = n)
   } else {
     # Fallback if column names are different
     mating_df <- mating_export %>%
-      rename(`# Matings` = n)
+      dplyr::rename(`# Matings` = n)
   }
   openxlsx::writeData(wb, "Mating Plan", mating_df)
   

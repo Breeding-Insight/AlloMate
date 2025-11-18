@@ -185,3 +185,22 @@ calculate_index <- function(joint_ebvs, rel_weights) {
   joint_ebvs$index_val <- as.vector(as.matrix(joint_ebvs[ebv_cols]) %*% rel_weights)
   joint_ebvs
 }
+
+#' Format a limited list of IDs for display
+#' @param ids Character vector of IDs
+#' @param limit Number of IDs to show before truncating
+#' @return Formatted character string ("" when no IDs)
+format_id_list <- function(ids, limit = 4) {
+  ids <- unique(ids)
+  ids <- ids[!is.na(ids) & ids != ""]
+
+  if (length(ids) == 0) {
+    return("")
+  }
+
+  if (length(ids) <= limit) {
+    paste(ids, collapse = ", ")
+  } else {
+    paste(c(ids[seq_len(limit)], "(5 or more)"), collapse = ", ")
+  }
+}

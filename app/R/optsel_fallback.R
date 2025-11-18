@@ -266,36 +266,41 @@ custom_noffspring <- function(Candidate, N) {
 
   nOff <- numeric(nrow(Candidate))
 
+  adjust_counts <- function(raw_vals, oc_vals, bv_vals, ids_vals) {
+    counts <- floor(raw_vals + 1e-9)
+    frac <- raw_vals - counts
+    id_key <- xtfrm(ids_vals)
+    target_total <- N
+    diff <- target_total - sum(counts)
+
+    if (diff > 0) {
+      ord <- order(-frac, -oc_vals, -bv_vals, id_key, na.last = TRUE)
+      take <- head(ord, min(diff, length(ord)))
+      counts[take] <- counts[take] + 1
+    } else if (diff < 0) {
+      ord <- order(frac, oc_vals, bv_vals, -id_key, na.last = TRUE)
+      take <- head(ord, min(abs(diff), length(ord)))
+      counts[take] <- pmax(0, counts[take] - 1)
+    }
+    counts
+  }
+
   if(sum(males) > 0) {
     male_raw <- raw_offspring[males]
-    male_int <- floor(male_raw)
-    male_frac <- male_raw - male_int
     male_oc <- Candidate$oc[males]
     male_bv <- if (has_bv) Candidate$BV[males] else rep(0, sum(males))
-
-    need <- as.integer(N - sum(male_int))
-    if(need > 0) {
-      ord <- order(male_frac, male_oc, male_bv, decreasing = TRUE)
-      idx <- ord[seq_len(min(need, length(ord)))]
-      male_int[idx] <- male_int[idx] + 1
-    }
-    nOff[males] <- male_int
+    male_ids <- Candidate$Indiv[males]
+    male_counts <- adjust_counts(male_raw, male_oc, male_bv, male_ids)
+    nOff[males] <- male_counts
   }
 
   if(sum(females) > 0) {
     female_raw <- raw_offspring[females]
-    female_int <- floor(female_raw)
-    female_frac <- female_raw - female_int
     female_oc <- Candidate$oc[females]
     female_bv <- if (has_bv) Candidate$BV[females] else rep(0, sum(females))
-
-    need <- as.integer(N - sum(female_int))
-    if(need > 0) {
-      ord <- order(female_frac, female_oc, female_bv, decreasing = TRUE)
-      idx <- ord[seq_len(min(need, length(ord)))]
-      female_int[idx] <- female_int[idx] + 1
-    }
-    nOff[females] <- female_int
+    female_ids <- Candidate$Indiv[females]
+    female_counts <- adjust_counts(female_raw, female_oc, female_bv, female_ids)
+    nOff[females] <- female_counts
   }
 
   data.frame(
@@ -306,7 +311,7 @@ custom_noffspring <- function(Candidate, N) {
 
 #' Mate allocation algorithm
 #' Replicates optiSel::matings functionality
-custom_matings <- function(Candidate, Kin, quiet = FALSE) {
+custom_matings <- function(Candidate, Kin, max_pair_kinship = NULL, quiet = FALSE) {
   active_candidates <- Candidate %>% dplyr::filter(n > 0)
 
   males <- active_candidates %>% dplyr::filter(Sex == "male")
@@ -325,10 +330,37 @@ custom_matings <- function(Candidate, Kin, quiet = FALSE) {
   costs <- as.matrix(K_mf)
   storage.mode(costs) <- "double"
 
+  allowed_mask <- !is.na(costs)
+  finite_costs <- costs[allowed_mask]
+  if (length(finite_costs) == 0) {
+    stop("❌ Kinship matrix does not contain any finite male/female pairings.")
+  }
+
+  enforce_threshold <- function() {
+    stop(
+      sprintf(
+        "❌ Unable to find a mating plan where every pair has kinship < %.4f. Try increasing the per-pair limit or reducing offspring.",
+        max_pair_kinship
+      )
+    )
+  }
+
+  if (!is.null(max_pair_kinship)) {
+    allowed_mask <- allowed_mask & (costs < max_pair_kinship)
+    if (!any(allowed_mask)) {
+      enforce_threshold()
+    }
+    if (any(rowSums(allowed_mask) == 0) || any(colSums(allowed_mask) == 0)) {
+      enforce_threshold()
+    }
+  }
+
   platform_tag <- tolower(R.version$platform)
   force_greedy <- isTRUE(getOption("allomate.force_greedy_mating", FALSE))
   detected_webr <- isTRUE(get0("is_webr", inherits = TRUE)) || grepl("emscripten|wasm", platform_tag)
-  use_greedy <- detected_webr || force_greedy
+  # Always respect the checkbox setting - user choice takes precedence
+  # In webR, the checkbox defaults to TRUE in global.R, but user can uncheck it
+  use_greedy <- force_greedy
   lp_available <- requireNamespace("lpSolve", quietly = TRUE)
 
   announce_algorithm <- function(label) {
@@ -344,6 +376,12 @@ custom_matings <- function(Candidate, Kin, quiet = FALSE) {
 
     pairs <- expand.grid(m = seq_len(n_m), f = seq_len(n_f),
                          KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)
+    pairs$allowed <- allowed_mask[cbind(pairs$m, pairs$f)]
+    pairs <- pairs[pairs$allowed, , drop = FALSE]
+    if (nrow(pairs) == 0) {
+      if (!is.null(max_pair_kinship)) enforce_threshold()
+      stop("❌ No feasible mating pairs available.")
+    }
     pairs$cost <- costs[cbind(pairs$m, pairs$f)]
     pairs <- pairs[order(pairs$cost, pairs$m, pairs$f), , drop = FALSE]
 
@@ -364,6 +402,9 @@ custom_matings <- function(Candidate, Kin, quiet = FALSE) {
     }
 
     if (sum(remaining_supply) != 0L || sum(remaining_demand) != 0L) {
+      if (!is.null(max_pair_kinship)) {
+        enforce_threshold()
+      }
       stop("❌ Greedy mating allocation incomplete. Check supply/demand consistency.")
     }
 
@@ -383,6 +424,12 @@ custom_matings <- function(Candidate, Kin, quiet = FALSE) {
     mean_inbreeding <- sum(matings_df$Kin * matings_df$n) / sum(matings_df$n)
     attr(matings_df, "objval") <- mean_inbreeding
     attr(matings_df, "info") <- info_label
+    if (!is.null(max_pair_kinship)) {
+      attr(matings_df, "info") <- paste0(
+        attr(matings_df, "info"),
+        sprintf(" | per-pair kinship < %.4f", max_pair_kinship)
+      )
+    }
 
     if (!quiet) {
       cat("\n--- Mating Diagnostics ---\n")
@@ -394,10 +441,10 @@ custom_matings <- function(Candidate, Kin, quiet = FALSE) {
     matings_df
   }
 
-  greedy_label <- if (detected_webr) {
-    "Greedy allocation (webR, lpSolve skipped)"
+  greedy_label <- if (force_greedy && detected_webr) {
+    "Greedy allocation (user-selected, webR environment)"
   } else if (force_greedy) {
-    "Greedy allocation (forced via option)"
+    "Greedy allocation (user-selected)"
   } else {
     "Greedy allocation (lpSolve unavailable)"
   }
@@ -408,9 +455,36 @@ custom_matings <- function(Candidate, Kin, quiet = FALSE) {
 
   announce_algorithm("lpSolve transportation")
 
+  disallowed_mask <- !allowed_mask
+  solver_costs <- costs
+  solver_costs[is.na(solver_costs)] <- 0
+  if (any(disallowed_mask)) {
+    max_allowed_cost <- max(costs[allowed_mask], na.rm = TRUE)
+    if (!is.finite(max_allowed_cost)) {
+      max_allowed_cost <- 1
+    }
+    penalty_cost <- max_allowed_cost + max(1, max_allowed_cost)
+    solver_costs[disallowed_mask] <- penalty_cost
+  }
+
+  enforce_integer_transport <- function(solution_matrix) {
+    X_round <- round(solution_matrix)
+    X_round[X_round < 0] <- 0
+    storage.mode(X_round) <- "integer"
+
+    row_check <- supply - rowSums(X_round)
+    col_check <- demand - colSums(X_round)
+
+    if (any(row_check != 0) || any(col_check != 0)) {
+      return(NULL)
+    }
+
+    X_round
+  }
+
   sol <- tryCatch(
     lpSolve::lp.transport(
-      cost.mat = costs,
+      cost.mat = solver_costs,
       direction = "min",
       row.signs = rep("=", length(supply)),
       row.rhs = supply,
@@ -434,11 +508,33 @@ custom_matings <- function(Candidate, Kin, quiet = FALSE) {
 
   X <- matrix(sol$solution, nrow = length(supply), ncol = length(demand), byrow = TRUE)
 
-  idx <- which(X > 0, arr.ind = TRUE)
+  if (!is.null(max_pair_kinship)) {
+    used_disallowed <- which(X > 0 & disallowed_mask, arr.ind = TRUE)
+    if (nrow(used_disallowed) > 0) {
+      enforce_threshold()
+    }
+  }
+
+  X_integer <- enforce_integer_transport(X)
+  if (is.null(X_integer)) {
+    if (!quiet) {
+      cat("Rounded lpSolve transport solution inconsistent with supply/demand totals. Falling back to greedy mating.\n")
+    }
+    return(run_greedy("Greedy allocation (lpSolve rounding fallback)"))
+  }
+
+  if (!is.null(max_pair_kinship)) {
+    used_disallowed <- which(X_integer > 0 & disallowed_mask, arr.ind = TRUE)
+    if (nrow(used_disallowed) > 0) {
+      enforce_threshold()
+    }
+  }
+
+  idx <- which(X_integer > 0, arr.ind = TRUE)
   matings_df <- dplyr::tibble(
     Sire = male_ids[idx[, 1]],
     Dam = female_ids[idx[, 2]],
-    n = as.integer(X[idx]),
+    n = as.integer(X_integer[idx]),
     Kin = costs[idx]
   ) %>%
     dplyr::arrange(Kin)
@@ -446,6 +542,12 @@ custom_matings <- function(Candidate, Kin, quiet = FALSE) {
   mean_inbreeding <- sum(matings_df$Kin * matings_df$n) / sum(matings_df$n)
   attr(matings_df, "objval") <- mean_inbreeding
   attr(matings_df, "info") <- "Minimum-cost transportation mating (lpSolve)"
+  if (!is.null(max_pair_kinship)) {
+    attr(matings_df, "info") <- paste0(
+      attr(matings_df, "info"),
+      sprintf(" | per-pair kinship < %.4f", max_pair_kinship)
+    )
+  }
 
   if (!quiet) {
     cat("\n--- Mating Diagnostics ---\n")
@@ -458,8 +560,9 @@ custom_matings <- function(Candidate, Kin, quiet = FALSE) {
 }
 
 #' Main OCS function combining all steps
-run_custom_ocs <- function(candidates_df, kinship_matrix, ebv_index, 
-                           desired_inbreeding_rate, num_offspring) {
+run_custom_ocs <- function(candidates_df, kinship_matrix, ebv_index,
+                           desired_inbreeding_rate, num_offspring,
+                           per_pair_kinship_limit = NULL) {
   
   # Prepare phenotype data in required format
   phen <- data.frame(
@@ -497,7 +600,17 @@ run_custom_ocs <- function(candidates_df, kinship_matrix, ebv_index,
   }
   
   # Step 4: Mate allocation
-  Mating <- custom_matings(Candidate, Kin = sKin)
+  Mating <- custom_matings(
+    Candidate,
+    Kin = sKin,
+    max_pair_kinship = per_pair_kinship_limit
+  )
   
+  if (nrow(Mating) == 0) {
+    stop("❌ No feasible mating plan produced. Consider relaxing constraints or reducing offspring targets.")
+  }
+
+  validate_mating_consistency(Candidate, Mating)
+
   list(Candidate = Candidate, Mating = Mating)
 }
