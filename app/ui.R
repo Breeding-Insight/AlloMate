@@ -310,7 +310,7 @@ ui <- function(request) {
         # Dynamic startup guide and feedback
         div(
           id = "startup_guide",
-          style = "background-color: #ffffff; border: 1px solid #dee2e6; padding: 10px; margin-bottom: 15px; border-radius: 5px;",
+          style = "background-color: #ffffff; border: 1px solid #444444; padding: 10px; margin-bottom: 15px; border-radius: 5px;",
           h4("🚀 Getting Started"),
           htmlOutput("dynamic_guide"),
           conditionalPanel(
@@ -328,7 +328,7 @@ ui <- function(request) {
         ),
         
         wellPanel(
-          style = "background-color: #e3f2fd; border: 2px solid #2196f3; padding: 15px; margin-bottom: 20px; border-radius: 8px;",
+          style = "background-color: #ffffff; border: 2px solid #444444; padding: 15px; margin-bottom: 20px; border-radius: 8px;",
           h4("🧬 Core Data Inputs", style = "color: #1565c0; margin-bottom: 15px; border-bottom: 1px solid #2196f3; padding-bottom: 8px;"),
           p("These inputs are used by both Index Generation and OCS calculations:", style = "color: #6c757d; font-size: 12px; margin-bottom: 15px;"),
           
@@ -347,7 +347,7 @@ ui <- function(request) {
         ),
         
         wellPanel(
-          style = "background-color: #ffebee; border: 2px solid #f44336; padding: 15px; margin-bottom: 20px; border-radius: 8px;",
+          style = "background-color: #ffffff; border: 2px solid #444444; padding: 15px; margin-bottom: 20px; border-radius: 8px;",
           h4("⚖️ Weighted EBVs", style = "color: #c62828; margin-bottom: 15px; border-bottom: 1px solid #f44336; padding-bottom: 8px;"),
           p("Define traits and their relative importance for breeding decisions:", style = "color: #6c757d; font-size: 12px; margin-bottom: 15px;"),
           
@@ -363,7 +363,7 @@ ui <- function(request) {
         ),
         
         wellPanel(
-          style = "background-color: #fff3cd; border: 2px solid #ffeaa7; padding: 15px; margin-bottom: 20px; border-radius: 8px;",
+          style = "background-color: #ffffff; border: 2px solid #444444; padding: 15px; margin-bottom: 20px; border-radius: 8px;",
           h4("🎯 Optimum Contribution Selection", style = "color: #856404; margin-bottom: 15px; border-bottom: 1px solid #ffeaa7; padding-bottom: 8px;"),
           p("Configure breeding objectives and constraints:", style = "color: #6c757d; font-size: 12px; margin-bottom: 15px;"),
           
@@ -425,7 +425,7 @@ ui <- function(request) {
         ),
         
         wellPanel(
-          style = "background-color: #d4edda; border: 2px solid #c3e6cb; padding: 15px; margin-bottom: 20px; border-radius: 8px;",
+          style = "background-color: #ffffff; border: 2px solid #4444444; padding: 15px; margin-bottom: 20px; border-radius: 8px;",
           h4("📊 Export Results", style = "color: #155724; margin-bottom: 15px; border-bottom: 1px solid #c3e6cb; padding-bottom: 8px;"),
           p("Download all results in a single Excel file with multiple tabs:", style = "color: #6c757d; font-size: 12px; margin-bottom: 15px;"),
           downloadButton("download_all_results", "📥 Export All Results", 
