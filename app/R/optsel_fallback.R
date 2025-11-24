@@ -1,10 +1,12 @@
 # Custom OCS Implementation Functions
 # Note: All required packages are loaded in global.R
 
-#### Custom OCS Implementation Functions ####
-
-#' Create candidate object similar to optiSel::candes
-#' This structures data for optimization algorithms
+#' Create candidate object similar to candes
+#' @importFrom dplyr filter
+#' @param phen Data frame with columns Indiv, Sex, BV, isCandidate
+#' @param pKin Kinship matrix
+#' @param quiet Logical, suppress messages if TRUE
+#' @return Object of class 'custom_candes'
 custom_candes <- function(phen, pKin, quiet = FALSE) {
   # Validate inputs with Shadow Broker precision
   if(!all(c("Indiv", "Sex", "BV", "isCandidate") %in% names(phen))) {
@@ -42,8 +44,13 @@ custom_candes <- function(phen, pKin, quiet = FALSE) {
   return(cand_obj)
 }
 
-#' Custom implementation of optiSel::opticont
-#' Uses quadratic programming (quadprog) to solve OCS problem
+#' Custom implementation of opticont
+#' @importFrom dplyr mutate select arrange desc
+#' @param method Optimization method, e.g., "max.BV"
+#' @param cand Object returned by custom_candes
+#' @param con List containing constraints
+#' @param quiet Logical, suppress messages if TRUE
+#' @return Object of class 'custom_opticont'
 custom_opticont <- function(method, cand, con, quiet = FALSE) {
   target_trait <- substr(method, 5, nchar(method))
 
@@ -179,7 +186,7 @@ custom_opticont <- function(method, cand, con, quiet = FALSE) {
         }
 
         sol <- tryCatch(
-          quadprog::solve.QP(Dmat = Dmat, dvec = dvec, Amat = Amat, bvec = bvec, meq = 2),
+          solve.QP(Dmat = Dmat, dvec = dvec, Amat = Amat, bvec = bvec, meq = 2),
           error = function(e) stop(paste("QP solve failed:", e$message))
         )
         oc_qp <- enforce_sex_balance(sol$solution)
@@ -250,7 +257,10 @@ custom_opticont <- function(method, cand, con, quiet = FALSE) {
 }
 
 #' Calculate number of offspring from optimum contributions
-#' Replicates optiSel::noffspring functionality
+#' @importFrom stats xtfrm
+#' @param Candidate Data frame with columns Indiv, Sex, oc, optionally BV
+#' @param N Total number of offspring
+#' @return Data frame with Indiv and nOff
 custom_noffspring <- function(Candidate, N) {
   if(!all(c("Indiv", "Sex", "oc") %in% names(Candidate))) {
     stop("❌ Candidate must contain columns: Indiv, Sex, oc")
@@ -310,12 +320,17 @@ custom_noffspring <- function(Candidate, N) {
 }
 
 #' Mate allocation algorithm
-#' Replicates optiSel::matings functionality
+#' @importFrom dplyr filter tibble arrange
+#' @param Candidate Data frame with columns Indiv, Sex, n
+#' @param Kin Kinship matrix
+#' @param max_pair_kinship Optional numeric threshold
+#' @param quiet Logical, suppress messages if TRUE
+#' @return Data frame of matings with Sire, Dam, n, Kin
 custom_matings <- function(Candidate, Kin, max_pair_kinship = NULL, quiet = FALSE) {
-  active_candidates <- Candidate %>% dplyr::filter(n > 0)
+  active_candidates <- Candidate %>% filter(n > 0)
 
-  males <- active_candidates %>% dplyr::filter(Sex == "male")
-  females <- active_candidates %>% dplyr::filter(Sex == "female")
+  males <- active_candidates %>% filter(Sex == "male")
+  females <- active_candidates %>% filter(Sex == "female")
 
   if (nrow(males) == 0 || nrow(females) == 0) {
     stop("❌ Need at least one male and one female with n > 0")
@@ -413,13 +428,13 @@ custom_matings <- function(Candidate, Kin, max_pair_kinship = NULL, quiet = FALS
       stop("❌ No mating assignments produced.")
     }
 
-    matings_df <- dplyr::tibble(
+    matings_df <- tibble(
       Sire = male_ids[idx[, 1]],
       Dam = female_ids[idx[, 2]],
       n = as.integer(X[idx]),
       Kin = costs[idx]
     ) %>%
-      dplyr::arrange(Kin)
+      arrange(Kin)
 
     mean_inbreeding <- sum(matings_df$Kin * matings_df$n) / sum(matings_df$n)
     attr(matings_df, "objval") <- mean_inbreeding
@@ -483,7 +498,7 @@ custom_matings <- function(Candidate, Kin, max_pair_kinship = NULL, quiet = FALS
   }
 
   sol <- tryCatch(
-    lpSolve::lp.transport(
+    lp.transport(
       cost.mat = solver_costs,
       direction = "min",
       row.signs = rep("=", length(supply)),
@@ -531,13 +546,13 @@ custom_matings <- function(Candidate, Kin, max_pair_kinship = NULL, quiet = FALS
   }
 
   idx <- which(X_integer > 0, arr.ind = TRUE)
-  matings_df <- dplyr::tibble(
+  matings_df <- tibble(
     Sire = male_ids[idx[, 1]],
     Dam = female_ids[idx[, 2]],
     n = as.integer(X_integer[idx]),
     Kin = costs[idx]
   ) %>%
-    dplyr::arrange(Kin)
+    arrange(Kin)
 
   mean_inbreeding <- sum(matings_df$Kin * matings_df$n) / sum(matings_df$n)
   attr(matings_df, "objval") <- mean_inbreeding
@@ -560,6 +575,14 @@ custom_matings <- function(Candidate, Kin, max_pair_kinship = NULL, quiet = FALS
 }
 
 #' Main OCS function combining all steps
+#' @importFrom dplyr filter
+#' @param candidates_df Data frame of candidate IDs and sex
+#' @param kinship_matrix Kinship matrix
+#' @param ebv_index Vector of estimated breeding values
+#' @param desired_inbreeding_rate Numeric, upper limit of mean kinship
+#' @param num_offspring Number of offspring to produce
+#' @param per_pair_kinship_limit Optional per-pair kinship threshold
+#' @return List with Candidate and Mating data frames
 run_custom_ocs <- function(candidates_df, kinship_matrix, ebv_index,
                            desired_inbreeding_rate, num_offspring,
                            per_pair_kinship_limit = NULL) {

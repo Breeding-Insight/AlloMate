@@ -54,7 +54,13 @@ if (app_dir) {
   source("app/R/pure_xlsx_writer.R")
 }
 
-# Helper function to check if optiSel package is actually loaded
+#' Check if the optiSel package is loaded and available
+#' @return TRUE if optiSel namespace is loaded and candes exists, FALSE otherwise
+
+#' Safely assign a function alias in the global environment
+#' @param alias_name Name of the alias to assign
+#' @param custom_function Function object to assign
+#' @return TRUE if assignment succeeded, FALSE if skipped due to locked binding or existing optiSel functions
 is_optisel_loaded <- function() {
   tryCatch({
     # Check if optiSel namespace exists
