@@ -2,7 +2,6 @@
 # Functions for reading, cleaning, and processing input data
 
 #' Fallback fixParents
-#' @importFrom base data.frame
 #' @param id vector of IDs
 #' @param sire vector of sires
 #' @param dam vector of dams
@@ -25,7 +24,6 @@ fallback_pedigree <- function(id, dadid, momid, sex, missid = "0") {
 }
 
 #' Fallback kinship
-#' @importFrom base matrix length
 #' @param ped pedigree list
 #' @return matrix
 fallback_kinship <- function(ped) {

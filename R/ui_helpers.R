@@ -32,7 +32,6 @@ create_ocs_trait_inputs <- function(n) {
 }
 
 #' Generate package status text
-#' @importFrom utils head
 #' @return Formatted status text for display
 generate_package_status <- function() {
   optisel_flag <- exists("optisel_available") && isTRUE(optisel_available)
@@ -58,7 +57,6 @@ generate_package_status <- function() {
 }
 
 #' Check if WebR is detected
-#' @importFrom base exists
 #' @return TRUE if WebR environment detected
 is_webr_environment <- function() {
   exists("is_webr") && is_webr
@@ -159,7 +157,6 @@ validate_file_upload <- function(file, required_cols = NULL, file_type = "file")
 }
 
 #' Generate user feedback messages
-#' @importFrom base paste0
 #' @param success Whether operation was successful
 #' @param message Success or error message
 #' @param operation Type of operation performed

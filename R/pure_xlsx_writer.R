@@ -4,7 +4,6 @@
 ## work inside WebR where compiled extensions are unavailable.
 
 #' Convert an integer column index to an Excel-style column label.
-#' @importFrom base stopifnot paste0 intToUtf8
 #' @param index Positive integer column index (1-based).
 #' @return Column label (e.g. 1 -> "A", 28 -> "AB").
 excel_column_label <- function(index) {
@@ -19,7 +18,6 @@ excel_column_label <- function(index) {
 }
 
 #' Escape XML special characters.
-#' @importFrom base gsub
 #' @param x Character vector.
 #' @return Escaped character vector safe for XML content.
 xml_escape <- function(x) {
@@ -32,7 +30,6 @@ xml_escape <- function(x) {
 }
 
 #' Retrieve precomputed CRC32 lookup table.
-#' @importFrom base as.integer
 #' @return Integer vector of length 256 with CRC32 values.
 get_crc32_table <- local({
   table <- NULL
@@ -58,7 +55,6 @@ get_crc32_table <- local({
 })
 
 #' Compute CRC32 checksum for a raw vector.
-#' @importFrom base bitwNot bitwAnd bitwXor bitwShiftR as.integer
 #' @param raw_vec Raw vector.
 #' @return Signed 32-bit integer representing CRC32.
 crc32_bytes <- function(raw_vec) {
@@ -75,7 +71,6 @@ crc32_bytes <- function(raw_vec) {
 }
 
 #' Convert POSIXct timestamp to DOS date/time components.
-#' @importFrom base as.POSIXlt as.integer floor
 #' @param timestamp POSIXct timestamp.
 #' @return List with `date` and `time` integer components.
 to_dos_datetime <- function(timestamp) {
@@ -97,7 +92,6 @@ to_dos_datetime <- function(timestamp) {
 }
 
 #' Write a 16-bit little-endian value.
-#' @importFrom base as.integer c
 #' @param value Integer value (0-65535).
 #' @return Raw vector of length 2.
 write_le16 <- function(value) {
@@ -111,7 +105,6 @@ write_le16 <- function(value) {
 }
 
 #' Write a 32-bit little-endian value.
-#' @importFrom base as.numeric as.integer floor c
 #' @param value Integer/double value (0-4294967295).
 #' @return Raw vector of length 4.
 write_le32 <- function(value) {
@@ -128,8 +121,6 @@ write_le32 <- function(value) {
 }
 
 #' Create a ZIP archive without external dependencies (store method).
-#' @importFrom base file file.path length vector list file.info readBin close c
-#' @importFrom utils zip
 #' @param output_file Destination ZIP file path.
 #' @param base_dir Directory containing files to archive.
 #' @param files Character vector of file paths relative to `base_dir`.
@@ -239,10 +230,7 @@ write_zip_no_compress <- function(output_file, base_dir, files) {
   invisible(output_file)
 }
 
-
 #' Create a ZIP archive without external dependencies (store method).
-#' @importFrom base file file.path length vector list file.info readBin close c
-#' @importFrom utils zip
 #' @param output_file Destination ZIP file path.
 #' @param base_dir Directory containing files to archive.
 #' @param files Character vector of file paths relative to `base_dir`.
@@ -268,7 +256,6 @@ write_zip_no_compress <- function(output_file, base_dir, files) {
 
 #' Gather string content from a data frame (including headers) for the
 #' shared strings table.
-#' @importFrom base character seq_along is.na as.character
 #' @param df Data frame.
 #' @return Character vector of strings (with duplicates).
 gather_sheet_strings <- function(df) {
@@ -300,7 +287,6 @@ gather_sheet_strings <- function(df) {
 }
 
 #' Build XML for a worksheet.
-#' @importFrom base nrow ncol seq_len paste0 sprintf length
 #' @param df Data frame representing the sheet (headers included).
 #' @param strings_map Named integer vector mapping strings to indices.
 #' @return Character vector with XML lines.
@@ -381,7 +367,6 @@ build_sheet_xml <- function(df, strings_map) {
 }
 
 #' Sanitize sheet names to comply with Excel restrictions.
-#' @importFrom base gsub nchar substr make.unique
 #' @param names Character vector of names.
 #' @return Safe, unique sheet names.
 sanitize_sheet_names <- function(names) {
@@ -392,7 +377,6 @@ sanitize_sheet_names <- function(names) {
 }
 
 #' Minimal styles XML content.
-#' @importFrom base c
 #' @return Character vector of XML lines.
 styles_xml_content <- function() {
   c(
@@ -409,7 +393,6 @@ styles_xml_content <- function() {
 }
 
 #' Create a simple shared strings XML document.
-#' @importFrom base length sprintf c
 #' @param unique_strings Character vector of unique strings.
 #' @param total_count Total number of string occurrences in workbook.
 #' @return Character vector of XML lines.
@@ -430,7 +413,6 @@ shared_strings_xml <- function(unique_strings, total_count) {
 }
 
 #' Minimal styles XML content.
-#' @importFrom base c
 #' @return Character vector of XML lines.
 workbook_rels_xml <- function(sheet_files) {
   rels <- c('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
@@ -450,7 +432,6 @@ workbook_rels_xml <- function(sheet_files) {
 }
 
 #' Minimal styles XML content.
-#' @importFrom base c
 #' @return Character vector of XML lines.
 workbook_xml <- function(sheet_names) {
   xml <- c('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
@@ -465,7 +446,6 @@ workbook_xml <- function(sheet_names) {
 }
 
 #' Generate [Content_Types].xml content.
-#' @importFrom base sprintf c
 #' @param sheet_files Character vector of worksheet filenames.
 #' @return Character vector of XML lines.
 content_types_xml <- function(sheet_files) {
@@ -487,7 +467,6 @@ content_types_xml <- function(sheet_files) {
 }
 
 #' Generate [Content_Types].xml content.
-#' @importFrom base sprintf c
 #' @param sheet_files Character vector of worksheet filenames.
 #' @return Character vector of XML lines.
 core_props_xml <- function(creator, timestamp) {
@@ -503,7 +482,6 @@ core_props_xml <- function(creator, timestamp) {
 }
 
 #' Generate [Content_Types].xml content.
-#' @importFrom base sprintf c
 #' @param sheet_files Character vector of worksheet filenames.
 #' @return Character vector of XML lines.
 app_props_xml <- function(sheet_names) {
@@ -530,7 +508,6 @@ app_props_xml <- function(sheet_names) {
 }
 
 #' Generate [Content_Types].xml content.
-#' @importFrom base sprintf c
 #' @param sheet_files Character vector of worksheet filenames.
 #' @return Character vector of XML lines.
 root_relationships_xml <- function() {
@@ -545,7 +522,6 @@ root_relationships_xml <- function() {
 }
 
 #' Generate [Content_Types].xml content.
-#' @importFrom base sprintf c
 #' @param sheet_files Character vector of worksheet filenames.
 #' @return Character vector of XML lines.
 write_xlsx_pure <- function(file, sheets, creator = "AlloMate") {
