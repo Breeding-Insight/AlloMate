@@ -1,5 +1,6 @@
 # Global.R - Simple package setup
 # This file runs once when the Shiny app starts
+Sys.setenv(RGL_USE_NULL = "TRUE")
 
 # Check if we're in the app directory or project root
 if (dir.exists("R") && dir.exists("www")) {

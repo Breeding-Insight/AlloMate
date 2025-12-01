@@ -121,6 +121,7 @@ write_le32 <- function(value) {
 }
 
 #' Create a ZIP archive without external dependencies (store method).
+#' @importFrom utils zip
 #' @param output_file Destination ZIP file path.
 #' @param base_dir Directory containing files to archive.
 #' @param files Character vector of file paths relative to `base_dir`.
@@ -231,6 +232,7 @@ write_zip_no_compress <- function(output_file, base_dir, files) {
 }
 
 #' Create a ZIP archive without external dependencies (store method).
+#' @importFrom utils zip
 #' @param output_file Destination ZIP file path.
 #' @param base_dir Directory containing files to archive.
 #' @param files Character vector of file paths relative to `base_dir`.
