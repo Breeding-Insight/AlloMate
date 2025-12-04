@@ -120,9 +120,14 @@ app_ui <- function(request) {
               h5("📋 File Status", style = "color: #495057; margin-top: 0; margin-bottom: 10px; font-size: 14px;"),
               htmlOutput("file_status_display")
             ),
-            actionButton("view_r_code_btn", "📝 View R Code",
-                         style = "width: 100%; background-color: #17a2b8; color: white; border: none; padding: 10px; border-radius: 5px;")
-          )
+            tags$a(
+              href = "https://github.com/Breeding-Insight/AlloMate",  
+              target = "_blank",  
+              class = "btn btn-info",
+              style = "width: 100%; background-color: #17a2b8; color: white; 
+                      border: none; padding: 10px; border-radius: 5px; text-align: center;",
+              "📝 View R Code"
+            )          )
         ),
 
         mainPanel(
