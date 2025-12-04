@@ -51,13 +51,6 @@ app_ui <- function(request) {
             style = "background-color: #ffffff; border: 1px solid #444444; padding: 10px; margin-bottom: 15px; border-radius: 5px;",
             h4("🚀 Getting Started"),
             htmlOutput("dynamic_guide"),
-            conditionalPanel(
-              condition = "output.webr_detected",
-              div(
-                style = "background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 8px; margin-top: 10px; border-radius: 3px;",
-                p("🌐 WebR environment detected. Custom OCS fallback will be used since optiSel is not available in WebR.")
-              )
-            ),
             div(
               style = "text-align: center; margin-top: 15px; padding-top: 10px; border-top: 1px solid #dee2e6;",
               actionButton("help_btn", "❓ Help",
@@ -159,28 +152,6 @@ app_ui <- function(request) {
                        uiOutput("ocs_solver_note"),
                        br(),
                        DTOutput("ocs_mating_table")
-                     )
-            ),
-            tabPanel("R Code",
-                     div(
-                       style = "padding: 20px; background-color: #f8f9fa; border-radius: 8px; margin: 10px 0; max-height: 80vh; overflow-y: auto; position: relative;",
-                       div(
-                         style = "background-color: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);",
-                         div(
-                           style = "text-align: center; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid #007bff;",
-                           h2("📝 R Code Implementation", style = "color: #007bff; margin-bottom: 10px;"),
-                           p("Complete R code for implementing AlloMate analysis independently", style = "color: #666; font-size: 16px;")
-                         ),
-                         div(
-                           style = "text-align: center; margin-bottom: 20px;",
-                           downloadButton("download_r_code", "📥 Download Complete R Script",
-                                          style = "background-color: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 5px; font-size: 14px;")
-                         ),
-                         div(
-                           style = "line-height: 1.6; font-size: 14px;",
-                           htmlOutput("r_code_content")
-                         )
-                       )
                      )
             ),
             tabPanel("Help",

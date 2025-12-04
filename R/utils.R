@@ -63,6 +63,8 @@ read_candidates <- function(file) {
 #' @param return_stats whether to return stats
 #' @return cleaned pedigree
 clean_pedigree <- function(ped, return_stats = FALSE) {
+  kinship2_available <- requireNamespace("kinship2", quietly = TRUE)
+
   ped_chr <- ped %>% mutate(across(c(id, sire, dam), as.character))
   is_missing_parent <- function(x) { is.na(x) | x == "" | x == "0" }
   total_records <- nrow(ped_chr)
@@ -77,8 +79,8 @@ clean_pedigree <- function(ped, return_stats = FALSE) {
     parents_fixed$dam[parents_fixed$dam %in% messy_parents$id] <- 0
     parents_fixed
   } %>% { .[!duplicated(.$id), ] } %>% { circdep <- .; circdep$id <- as.character(circdep$id); circdep$sire <- as.character(circdep$sire); circdep$dam <- as.character(circdep$dam); circdep <- circdep[circdep$id == circdep$sire | circdep$id == circdep$dam, ]; .[!.$id %in% circdep$id, ] } %>%
-    with(., if (exists("kinship2_available") && kinship2_available) fixParents(id, sire, dam, sex, missid = "0") else fallback_fixParents(id, sire, dam, sex, missid = "0")) %>%
-    with(., if (exists("kinship2_available") && kinship2_available) pedigree(id, dadid, momid, sex, missid = "0") else fallback_pedigree(id, dadid, momid, sex, missid = "0"))
+    with(., if (exists("kinship2_available") && kinship2_available) kinship2::fixParents(id, sire, dam, sex, missid = "0") else fallback_fixParents(id, sire, dam, sex, missid = "0")) %>%
+    with(., if (exists("kinship2_available") && kinship2_available) kinship2::pedigree(id, dadid, momid, sex, missid = "0") else fallback_pedigree(id, dadid, momid, sex, missid = "0"))
   if (return_stats) {
     stats <- list(records_loaded = total_records, unknown_parent_count = unknown_parent_count, circular_reference_count = circular_reference_count, duplicates_removed = duplicates_removed)
     return(list(pedigree = final_ped, stats = stats))
@@ -94,7 +96,9 @@ clean_pedigree <- function(ped, return_stats = FALSE) {
 #' @param females females
 #' @return list
 compute_kinship_matrix <- function(ped, males, females) {
-  kinship_matrix <- if (exists("kinship2_available") && kinship2_available) kinship(ped) else fallback_kinship(ped)
+  kinship2_available <- requireNamespace("kinship2", quietly = TRUE)
+
+  kinship_matrix <- if (exists("kinship2_available") && kinship2_available) kinship2::kinship(ped) else fallback_kinship(ped)
   kin_mat_sel <- kinship_matrix[males, females]
   kin_quads <- tibble(Data = "Kinship", Q25 = quantile(kin_mat_sel, 0.25), Q50 = quantile(kin_mat_sel, 0.50), Q75 = quantile(kin_mat_sel, 0.75), Q100 = quantile(kin_mat_sel, 1.00)) %>% column_to_rownames("Data")
   kinship_results <- as_tibble(kin_mat_sel, rownames = "Male") %>% pivot_longer(-Male, names_to = "Female", values_to = "Kinship")
