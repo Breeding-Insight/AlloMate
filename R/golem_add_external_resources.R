@@ -8,7 +8,7 @@
 #' @return Shiny tags for inclusion in the UI
 golem_add_external_resources <- function() {
   
-  # Add a folder to the resource path (www folder inside your package)
+  # Map the 'www' URL in the app to the package folder
   add_resource_path(
     "www", system.file("inst/app/www", package = "AlloMate")
   )
@@ -16,7 +16,7 @@ golem_add_external_resources <- function() {
   # Include resources in the UI
   tags$head(
     # Favicon
-    tags$link(rel = "shortcut icon", href = "inst/app/www/favicon.ico"),
+    tags$link(rel = "shortcut icon", href = "www/favicon.ico"),
     
     # Custom CSS
     tags$link(rel = "stylesheet", type = "text/css", href = "www/custom.css"),
@@ -24,7 +24,7 @@ golem_add_external_resources <- function() {
     # Custom JavaScript
     tags$script(src = "www/custom.js"),
     
-    # Any other head tags can be added here
+    # Any other head tags
     tags$meta(name = "viewport", content = "width=device-width, initial-scale=1")
   )
 }
