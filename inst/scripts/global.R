@@ -1,3 +1,5 @@
+# Defunct since version 0.0.0.9001
+
 # Global.R - Simple package setup
 # This file runs once when the Shiny app starts
 Sys.setenv(RGL_USE_NULL = "TRUE")

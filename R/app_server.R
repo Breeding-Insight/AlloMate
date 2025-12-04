@@ -3,6 +3,16 @@
 #' @param input,output,session Internal parameters for {shiny}.
 #'     DO NOT REMOVE.
 #' @import shiny
+#' 
+#' @importFrom dplyr filter select mutate pull left_join relocate bind_rows n_distinct
+#' @importFrom magrittr %>%
+#' @importFrom tidyr pivot_longer replace_na 
+#' @importFrom tibble tibble as_tibble column_to_rownames
+#' @importFrom DT datatable formatStyle
+#' @importFrom shinyjs show hide
+#' @importFrom readr read_table
+#' @importFrom openxlsx createWorkbook addWorksheet writeData saveWorkbook
+#' 
 #' @noRd
 app_server <- function(input, output, session) {
 

@@ -10,7 +10,7 @@ golem_add_external_resources <- function() {
   
   # Map the 'www' URL in the app to the package folder
   add_resource_path(
-    "www", system.file("inst/app/www", package = "AlloMate")
+    "www", app_sys("app/www")
   )
   
   # Include resources in the UI

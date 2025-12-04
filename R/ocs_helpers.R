@@ -11,6 +11,10 @@
 #' @param desired_inbreeding_rate Target inbreeding rate constraint
 #' @param num_offspring Number of offspring to allocate
 #' @param per_pair_kinship_limit Optional maximum kinship allowed for any mating pair
+#' 
+#' @importFrom dplyr filter
+#' @importFrom magrittr %>%
+#' 
 #' @return List with Candidate and Mating results
 run_ocs <- function(candidates_df,
                     kinship_matrix,
@@ -137,6 +141,7 @@ run_ocs <- function(candidates_df,
 
 #' Reconcile offspring counts with realized matings
 #' @importFrom dplyr filter
+#' @importFrom magrittr %>%
 #' @param Candidate Candidate data frame with n column from noffspring
 #' @param Mating Mating plan containing Sire, Dam, and n columns
 reconcile_offspring_with_matings <- function(Candidate, Mating) {
@@ -276,6 +281,7 @@ validate_ocs_inputs <- function(candidates_df, kinship_matrix, ebv_index,
 
 #' Format OCS results for display
 #' @importFrom dplyr select mutate rename
+#' @importFrom magrittr %>%
 #' @param results OCS results list
 #' @return Formatted results for UI display
 format_ocs_results <- function(results) {
@@ -370,6 +376,7 @@ reset_ocs_runtime <- function() {
 #' Create Excel workbook with OCS results
 #' @importFrom openxlsx createWorkbook addWorksheet writeData
 #' @importFrom dplyr select mutate rename filter
+#' @importFrom magrittr %>%
 #' @param results OCS results list
 #' @param params OCS parameters used
 #' @param kinship_threshold Optional per-pair kinship threshold for filtering matings
