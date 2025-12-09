@@ -38,7 +38,7 @@ app_ui <- function(request) {
       ## ─── Banner ───────────────────────────
       div(
         style = "display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;",
-        tags$img(src = "www/allomate.png", height = "120px", style = "margin-left: 20px;"),
+        tags$img(src = "www/allomate.png", height = "160px", style = "margin-left: 20px;"),
         tags$img(src = "www/logos2.png", style = "width: 67%; height: auto;")
       ),
 
@@ -53,7 +53,7 @@ app_ui <- function(request) {
             htmlOutput("dynamic_guide"),
             div(
               style = "text-align: center; margin-top: 15px; padding-top: 10px; border-top: 1px solid #dee2e6;",
-              actionButton("help_btn",tagList((icon("circle-question"))),
+              actionButton("help_btn",tagList((icon("circle-question")),"Help"),
                            style = "background-color: #FFD700; color: #000000; border:none; padding: 8px 16px; border-radius: 5px;")
             )
           ),
@@ -112,12 +112,12 @@ app_ui <- function(request) {
           wellPanel(
             style = "background-color: #ffffff; border: 2px solid #444444; padding: 15px; margin-bottom: 20px; border-radius: 8px;",
             h4(tagList(icon("bar-chart"), "Export Results"), style = "color: #000000; margin-bottom: 15px; border-bottom: 1px solid #c3e6cb; padding-bottom: 8px;"),
-            p("Download all results in a single Excel file with multiple tabs:", style = "color: #6c757d; font-size: 12px; margin-bottom: 15px;"),
+            p("Download all results in a single zip file:", style = "color: #6c757d; font-size: 12px; margin-bottom: 15px;"),
             downloadButton("download_all_results", "Export All Results",
                            style = "width: 100%; background-color: #28a745; color: white; border: none; padding: 10px; border-radius: 5px; margin-bottom: 10px;"),
             div(
               style = "background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 12px; margin-bottom: 10px; border-radius: 5px;",
-              h5("📋 File Status", style = "color: #495057; margin-top: 0; margin-bottom: 10px; font-size: 14px;"),
+              h5(tagList(icon("file"),"File Status"), style = "color: #495057; margin-top: 0; margin-bottom: 10px; font-size: 14px;"),
               htmlOutput("file_status_display")
             ),
             tags$a(

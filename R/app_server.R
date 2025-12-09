@@ -304,18 +304,23 @@ app_server <- function(input, output, session) {
   })
 
   # Export: Prebuild workbook so Chrome downloads reliably
+  # Reactive cache for export
   export_cache <- reactiveVal(NULL)
-
-  generate_export_xlsx <- function(dest_file) {
-    use_openxlsx <- requireNamespace("openxlsx", quietly = TRUE)
+  
+  # Function to generate ZIP of CSVs
+  generate_export_zip <- function(dest_zip) {
     safe_char <- function(x) if (is.null(x) || length(x) == 0) NA_character_ else as.character(x)
-
+    
+    tmp_dir <- tempfile("export_csvs")
+    dir.create(tmp_dir)
+    
+    # README
     readme_text <- c(
       "📊 AlloMate Complete Results Report",
       "",
-      "This Excel file contains all results from your AlloMate analysis:",
+      "This CSV collection contains all results from your AlloMate analysis:",
       "",
-      "📋 Worksheets included:",
+      "📋 Files included:",
       "1. README - This overview and explanation",
       "2. Filtered Results - Crosses meeting criteria (positive EBVs, kinship below threshold)",
       "3. EBV Matrix - Complete matrix view with masked values",
@@ -330,42 +335,46 @@ app_server <- function(input, output, session) {
       "",
       "📅 Generated on:", as.character(Sys.Date())
     )
-
+    write.csv(data.frame(Text = readme_text, stringsAsFactors = FALSE),
+              file.path(tmp_dir, "README.csv"), row.names = FALSE)
+    
+    # EBV results
     ebv_results <- ebv_results_reactive()
-    mat_for_excel <- NULL
-    filtered_results_df <- NULL
-    ebv_matrix_df <- NULL
-
     if (!is.null(ebv_results)) {
+      # Filtered Results
+      filtered_results_df <- as.data.frame(ebv_results$filt_results_table)
+      write.csv(filtered_results_df, file.path(tmp_dir, "Filtered_Results.csv"), row.names = TRUE)
+      
+      # EBV Matrix
       m_ids <- unique(ebv_results$full_results$Male)
       f_ids <- unique(ebv_results$full_results$Female)
-      mat_for_excel <- matrix(NA_real_, nrow = length(m_ids), ncol = length(f_ids),
-                              dimnames = list(m_ids, f_ids))
-
+      mat_for_csv <- matrix(NA_real_, nrow = length(m_ids), ncol = length(f_ids),
+                            dimnames = list(m_ids, f_ids))
+      
       if (nrow(ebv_results$filt_results_matrix) > 0) {
         for (i in seq_len(nrow(ebv_results$filt_results_matrix))) {
           m <- ebv_results$filt_results_matrix$Male[i]
           f <- ebv_results$filt_results_matrix$Female[i]
           val <- ebv_results$filt_results_matrix$EBV[i]
           if (!is.na(m) && !is.na(f) &&
-              m %in% rownames(mat_for_excel) && f %in% colnames(mat_for_excel)) {
-            mat_for_excel[m, f] <- val
+              m %in% rownames(mat_for_csv) && f %in% colnames(mat_for_csv)) {
+            mat_for_csv[m, f] <- val
           }
         }
       }
-
-      filtered_results_df <- as.data.frame(ebv_results$filt_results_table)
-
-      row_labels <- rownames(mat_for_excel)
-      if (is.null(row_labels)) row_labels <- seq_len(nrow(mat_for_excel))
+      
+      row_labels <- rownames(mat_for_csv)
+      if (is.null(row_labels)) row_labels <- seq_len(nrow(mat_for_csv))
       ebv_matrix_df <- data.frame(
         Male = row_labels,
-        mat_for_excel,
+        mat_for_csv,
         check.names = FALSE,
         stringsAsFactors = FALSE
       )
+      write.csv(ebv_matrix_df, file.path(tmp_dir, "EBV_Matrix.csv"), row.names = FALSE)
     }
-
+    
+    # OCS results
     formatted_results <- NULL
     if (!is.null(ocs_results_reactive())) {
       formatted_results <- tryCatch(
@@ -375,8 +384,15 @@ app_server <- function(input, output, session) {
           NULL
         }
       )
+      if (!is.null(formatted_results)) {
+        write.csv(as.data.frame(formatted_results$candidate_table),
+                  file.path(tmp_dir, "OCS_Candidates.csv"), row.names = FALSE)
+        write.csv(as.data.frame(formatted_results$mating_table),
+                  file.path(tmp_dir, "Mating_Plan.csv"), row.names = FALSE)
+      }
     }
-
+    
+    # Parameters
     params_data <- data.frame(
       Parameter = c("Kinship Threshold", "Desired Inbreeding Rate", "Number of Offspring", "Analysis Date"),
       Value = c(
@@ -387,56 +403,17 @@ app_server <- function(input, output, session) {
       ),
       stringsAsFactors = FALSE
     )
-
-    ok <- FALSE
-    tryCatch({
-      if (use_openxlsx) {
-        wb <- openxlsx::createWorkbook()
-
-        openxlsx::addWorksheet(wb, "README")
-        openxlsx::writeData(wb, "README", readme_text)
-
-        if (!is.null(ebv_results)) {
-          openxlsx::addWorksheet(wb, "Filtered Results")
-          openxlsx::writeData(wb, "Filtered Results", filtered_results_df, rowNames = TRUE)
-
-          openxlsx::addWorksheet(wb, "EBV Matrix")
-          openxlsx::writeData(wb, "EBV Matrix", ebv_matrix_df, rowNames = FALSE)
-        }
-
-        if (!is.null(formatted_results)) {
-          openxlsx::addWorksheet(wb, "OCS Candidates")
-          openxlsx::writeData(wb, "OCS Candidates", formatted_results$candidate_table, rowNames = FALSE)
-
-          openxlsx::addWorksheet(wb, "Mating Plan")
-          openxlsx::writeData(wb, "Mating Plan", formatted_results$mating_table, rowNames = FALSE)
-        }
-
-        openxlsx::addWorksheet(wb, "Parameters")
-        openxlsx::writeData(wb, "Parameters", params_data, rowNames = FALSE)
-
-        openxlsx::saveWorkbook(wb, dest_file, overwrite = TRUE)
-      } else {
-        sheets <- list(
-          README = data.frame(Text = readme_text, stringsAsFactors = FALSE),
-          Parameters = params_data
-        )
-        if (!is.null(filtered_results_df)) sheets$`Filtered Results` <- filtered_results_df
-        if (!is.null(ebv_matrix_df)) sheets$`EBV Matrix` <- ebv_matrix_df
-        if (!is.null(formatted_results)) {
-          sheets$`OCS Candidates` <- as.data.frame(formatted_results$candidate_table)
-          sheets$`Mating Plan` <- as.data.frame(formatted_results$mating_table)
-        }
-        write_xlsx_pure(dest_file, sheets)
-      }
-      ok <- TRUE
-    }, error = function(e) {
-      message("Export error: ", e$message)
-      writeLines(paste("Export failed:", e$message), dest_file, useBytes = TRUE)
-    })
-    ok
+    write.csv(params_data, file.path(tmp_dir, "Parameters.csv"), row.names = FALSE)
+    
+    # Create ZIP using relative paths
+    csv_files <- list.files(tmp_dir)  # relative file names
+    zip::zip(zipfile = dest_zip, files = csv_files, root = tmp_dir)
+    
+    unlink(tmp_dir, recursive = TRUE)
+    TRUE
   }
-
+  
+  # Observer to automatically export ZIP
   observeEvent({
     list(
       ebv_results_reactive(),
@@ -446,13 +423,12 @@ app_server <- function(input, output, session) {
       input$num_offspring
     )
   }, {
-    tmp <- tempfile(pattern = "allomate_export_", fileext = ".xlsx")
-    if (generate_export_xlsx(tmp) && file.exists(tmp) && file.info(tmp)$size > 0) {
+    tmp_zip <- tempfile(pattern = "allomate_export_", fileext = ".zip")
+    
+    if (generate_export_zip(tmp_zip) && file.exists(tmp_zip)) {
       old <- export_cache()
-      export_cache(tmp)
+      export_cache(tmp_zip)
       if (!is.null(old) && file.exists(old)) unlink(old, force = TRUE)
-    } else if (file.exists(tmp)) {
-      unlink(tmp, force = TRUE)
     }
   }, ignoreNULL = FALSE)
 
@@ -463,7 +439,7 @@ app_server <- function(input, output, session) {
 
   output$download_all_results <- downloadHandler(
     filename = function() {
-      paste0("AlloMate_Complete_Results-", Sys.Date(), ".xlsx")
+      paste0("AlloMate_Complete_Results-", Sys.Date(), ".zip")
     },
     content = function(file) {
       cache <- export_cache()
