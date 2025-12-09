@@ -307,18 +307,18 @@ app_server <- function(input, output, session) {
   # Reactive cache for export
   export_cache <- reactiveVal(NULL)
   
-  # Function to generate ZIP of CSVs
+  # Function to generate ZIP of TSVs
   generate_export_zip <- function(dest_zip) {
     safe_char <- function(x) if (is.null(x) || length(x) == 0) NA_character_ else as.character(x)
     
-    tmp_dir <- tempfile("export_csvs")
+    tmp_dir <- tempfile("export_tsvs")
     dir.create(tmp_dir)
     
     # README
     readme_text <- c(
       "📊 AlloMate Complete Results Report",
       "",
-      "This CSV collection contains all results from your AlloMate analysis:",
+      "This TSV collection contains all results from your AlloMate analysis:",
       "",
       "📋 Files included:",
       "1. README - This overview and explanation",
@@ -335,15 +335,16 @@ app_server <- function(input, output, session) {
       "",
       "📅 Generated on:", as.character(Sys.Date())
     )
-    write.csv(data.frame(Text = readme_text, stringsAsFactors = FALSE),
-              file.path(tmp_dir, "README.csv"), row.names = FALSE)
+    write.table(data.frame(Text = readme_text, stringsAsFactors = FALSE),
+                file.path(tmp_dir, "README.tsv"), sep="\t", row.names = FALSE, quote = FALSE)
     
     # EBV results
     ebv_results <- ebv_results_reactive()
     if (!is.null(ebv_results)) {
       # Filtered Results
       filtered_results_df <- as.data.frame(ebv_results$filt_results_table)
-      write.csv(filtered_results_df, file.path(tmp_dir, "Filtered_Results.csv"), row.names = TRUE)
+      write.table(filtered_results_df, file.path(tmp_dir, "Filtered_Results.tsv"),
+                  sep="\t", row.names = TRUE, quote = FALSE)
       
       # EBV Matrix
       m_ids <- unique(ebv_results$full_results$Male)
@@ -371,7 +372,8 @@ app_server <- function(input, output, session) {
         check.names = FALSE,
         stringsAsFactors = FALSE
       )
-      write.csv(ebv_matrix_df, file.path(tmp_dir, "EBV_Matrix.csv"), row.names = FALSE)
+      write.table(ebv_matrix_df, file.path(tmp_dir, "EBV_Matrix.tsv"),
+                  sep="\t", row.names = FALSE, quote = FALSE, na = "")
     }
     
     # OCS results
@@ -385,29 +387,32 @@ app_server <- function(input, output, session) {
         }
       )
       if (!is.null(formatted_results)) {
-        write.csv(as.data.frame(formatted_results$candidate_table),
-                  file.path(tmp_dir, "OCS_Candidates.csv"), row.names = FALSE)
-        write.csv(as.data.frame(formatted_results$mating_table),
-                  file.path(tmp_dir, "Mating_Plan.csv"), row.names = FALSE)
+        write.table(as.data.frame(formatted_results$candidate_table),
+                    file.path(tmp_dir, "OCS_Candidates.tsv"),
+                    sep="\t", row.names = FALSE, quote = FALSE)
+        write.table(as.data.frame(formatted_results$mating_table),
+                    file.path(tmp_dir, "Mating_Plan.tsv"),
+                    sep="\t", row.names = FALSE, quote = FALSE)
       }
     }
     
     # Parameters
     params_data <- data.frame(
-      Parameter = c("Kinship Threshold", "Desired Inbreeding Rate", "Number of Offspring", "Analysis Date"),
+      Parameter = c("Analysis Date", "Kinship Threshold", "Desired Inbreeding Rate", "Number of Offspring"),
       Value = c(
+        as.character(Sys.Date()),
         safe_char(input$thresh),
         safe_char(input$inbreeding_rate),
-        safe_char(input$num_offspring),
-        as.character(Sys.Date())
+        safe_char(input$num_offspring)
       ),
       stringsAsFactors = FALSE
     )
-    write.csv(params_data, file.path(tmp_dir, "Parameters.csv"), row.names = FALSE)
+    write.table(params_data, file.path(tmp_dir, "Parameters.tsv"),
+                sep="\t", row.names = FALSE, quote = FALSE)
     
     # Create ZIP using relative paths
-    csv_files <- list.files(tmp_dir)  # relative file names
-    zip::zip(zipfile = dest_zip, files = csv_files, root = tmp_dir)
+    tsv_files <- list.files(tmp_dir)  # relative file names
+    zip::zip(zipfile = dest_zip, files = tsv_files, root = tmp_dir)
     
     unlink(tmp_dir, recursive = TRUE)
     TRUE
@@ -439,7 +444,7 @@ app_server <- function(input, output, session) {
 
   output$download_all_results <- downloadHandler(
     filename = function() {
-      paste0("AlloMate_Complete_Results-", Sys.Date(), ".zip")
+      paste0("AlloMate_results-", Sys.Date(), ".zip")
     },
     content = function(file) {
       cache <- export_cache()
