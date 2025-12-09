@@ -38,10 +38,10 @@ generate_package_status <- function() {
   optisel_flag <- requireNamespace("optiSel", quietly = TRUE)
   # maybe add the kinship2 check later if needed
   if (optisel_flag) {
-    status_text <- "✅ Optimum Contribution Selection: Ready\n📦 Current solver: optiSel"
-  } else {
-    status_text <- "✅ Optimum Contribution Selection: Ready\n📦 Current solver: quadprog fallback"
-  } 
+    status_text <- "Optimum Contribution Selection: Ready\n Current solver: Optisel"
+    } else { 
+      status_text <- "Optimum Contribution Selection: Ready\n Current solver: quadprog fallback"  
+      }
   status_text
 }
 
