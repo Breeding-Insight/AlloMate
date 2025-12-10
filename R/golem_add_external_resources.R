@@ -15,8 +15,11 @@ golem_add_external_resources <- function() {
   
   # Include resources in the UI
   tags$head(
+    # Browser tab title
+    tags$title("AlloMate"),
+    
     # Favicon
-    tags$link(rel = "shortcut icon", href = "www/favicon.ico"),
+    tags$link(rel = "shortcut icon", href = "www/allomate.png"),
     
     # Custom CSS
     tags$link(rel = "stylesheet", type = "text/css", href = "www/custom.css"),
