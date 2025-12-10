@@ -11,6 +11,10 @@
 #' @param desired_inbreeding_rate Target inbreeding rate constraint
 #' @param num_offspring Number of offspring to allocate
 #' @param per_pair_kinship_limit Optional maximum kinship allowed for any mating pair
+#' 
+#' @importFrom dplyr filter
+#' @importFrom magrittr %>%
+#' 
 #' @return List with Candidate and Mating results
 run_ocs <- function(candidates_df,
                     kinship_matrix,
@@ -18,11 +22,9 @@ run_ocs <- function(candidates_df,
                     desired_inbreeding_rate,
                     num_offspring,
                     per_pair_kinship_limit = NULL) {
-  using_optisel <- isTRUE(get0("optisel_available", inherits = TRUE)) &&
-    requireNamespace("optiSel", quietly = TRUE)
-  using_fallback <- isTRUE(get0("custom_ocs_available", inherits = TRUE)) && !using_optisel
+  using_optisel <-  requireNamespace("optiSel", quietly = TRUE)
   
-  if (!using_optisel && !using_fallback) {
+  if (!using_optisel) {
     stop("❌ OCS functionality is not available. Load optiSel or enable the custom fallback before running OCS.")
   }
   
@@ -39,9 +41,9 @@ run_ocs <- function(candidates_df,
   colnames(sKin) <- candidate_ids
   
   if (using_optisel) {
-    cand <- candes(phen = phen, pKin = sKin)
+    cand <- optiSel::candes(phen = phen, pKin = sKin)
     con <- list(ub.pKin = desired_inbreeding_rate)
-    Offspring <- opticont(method = "max.BV", cand = cand, con = con)
+    Offspring <- optiSel::opticont(method = "max.BV", cand = cand, con = con)
   } else {
     cand <- custom_candes(phen = phen, pKin = sKin)
     con <- list(ub.pKin = desired_inbreeding_rate)
@@ -90,7 +92,7 @@ run_ocs <- function(candidates_df,
   
   # Safe to call noffspring now that Candidate has valid data
   Candidate$n <- if (using_optisel) {
-    noffspring(Candidate, num_offspring)$nOff
+    optiSel::noffspring(Candidate, num_offspring)$nOff
   } else {
     custom_noffspring(Candidate, num_offspring)$nOff
   }
@@ -105,7 +107,7 @@ run_ocs <- function(candidates_df,
   should_use_custom_matings <- !is.null(per_pair_kinship_limit) || !using_optisel
   
   if (!should_use_custom_matings) {
-    Mating <- matings(Candidate, Kin = sKin_subset)
+    Mating <- optiSel::matings(Candidate, Kin = sKin_subset)
     if (nrow(Mating) > 0 && !"Kin" %in% names(Mating)) {
       Mating$Kin <- vapply(
         seq_len(nrow(Mating)),
@@ -137,6 +139,7 @@ run_ocs <- function(candidates_df,
 
 #' Reconcile offspring counts with realized matings
 #' @importFrom dplyr filter
+#' @importFrom magrittr %>%
 #' @param Candidate Candidate data frame with n column from noffspring
 #' @param Mating Mating plan containing Sire, Dam, and n columns
 reconcile_offspring_with_matings <- function(Candidate, Mating) {
@@ -276,6 +279,7 @@ validate_ocs_inputs <- function(candidates_df, kinship_matrix, ebv_index,
 
 #' Format OCS results for display
 #' @importFrom dplyr select mutate rename
+#' @importFrom magrittr %>%
 #' @param results OCS results list
 #' @return Formatted results for UI display
 format_ocs_results <- function(results) {
@@ -370,6 +374,7 @@ reset_ocs_runtime <- function() {
 #' Create Excel workbook with OCS results
 #' @importFrom openxlsx createWorkbook addWorksheet writeData
 #' @importFrom dplyr select mutate rename filter
+#' @importFrom magrittr %>%
 #' @param results OCS results list
 #' @param params OCS parameters used
 #' @param kinship_threshold Optional per-pair kinship threshold for filtering matings
@@ -389,7 +394,7 @@ create_ocs_workbook <- function(results, params = NULL, kinship_threshold = NULL
       c(
         paste("- Target inbreeding rate:", params$inbreeding_rate),
         paste("- Number of offspring:", params$num_offspring),
-        paste("- Implementation:", if (exists("custom_ocs_available") && custom_ocs_available) "Custom fallback" else "optiSel")
+        paste("- Implementation:", if (!requireNamespace("optiSel", quietly = TRUE)) "Custom fallback" else "optiSel")
       )
     } else {
       "Parameters not recorded"

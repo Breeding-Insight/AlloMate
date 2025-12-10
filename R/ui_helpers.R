@@ -35,32 +35,20 @@ create_ocs_trait_inputs <- function(n) {
 #' @importFrom utils head
 #' @return Formatted status text for display
 generate_package_status <- function() {
-  optisel_flag <- exists("optisel_available") && isTRUE(optisel_available)
-  fallback_flag <- exists("custom_ocs_available") && isTRUE(custom_ocs_available)
-  quadprog_flag <- exists("quadprog_available") && isTRUE(quadprog_available)
-
+  optisel_flag <- requireNamespace("optiSel", quietly = TRUE)
+  # maybe add the kinship2 check later if needed
   if (optisel_flag) {
-    status_text <- "✅ Optimum Contribution Selection: Ready\n📦 Current solver: optiSel"
-  } else if (fallback_flag && quadprog_flag) {
-    status_text <- "✅ Optimum Contribution Selection: Ready\n📦 Current solver: quadprog fallback"
-    if (exists("is_webr") && is_webr) {
-      status_text <- paste(status_text, "\nℹ️ optiSel not available in WebR", sep = "")
-    } else {
-      status_text <- paste(status_text, "\nℹ️ optiSel not installed", sep = "")
-    }
-  } else if (fallback_flag && !quadprog_flag) {
-    status_text <- "❌ Optimum Contribution Selection: Not Ready\n⚠️ quadprog package required for fallback\nℹ️ Install with: install.packages('quadprog')"
-  } else {
-    status_text <- "❌ Optimum Contribution Selection: Not Ready\n⚠️ Neither optiSel nor fallback available"
-  }
-
+    status_text <- "Optimum Contribution Selection: Ready\n Current solver: Optisel"
+    } else { 
+      status_text <- "Optimum Contribution Selection: Ready\n Current solver: quadprog fallback"  
+      }
   status_text
 }
 
 #' Check if WebR is detected
 #' @return TRUE if WebR environment detected
 is_webr_environment <- function() {
-  exists("is_webr") && is_webr
+  grepl("emscripten|wasm", tolower(R.version$platform))
 }
 
 #' Format kinship and EBV results for display

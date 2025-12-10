@@ -3,9 +3,12 @@
 
 #' Create candidate object similar to candes
 #' @importFrom dplyr filter
+#' @importFrom magrittr %>%
+#' 
 #' @param phen Data frame with columns Indiv, Sex, BV, isCandidate
 #' @param pKin Kinship matrix
 #' @param quiet Logical, suppress messages if TRUE
+#' 
 #' @return Object of class 'custom_candes'
 custom_candes <- function(phen, pKin, quiet = FALSE) {
   # Validate inputs with Shadow Broker precision
@@ -46,6 +49,9 @@ custom_candes <- function(phen, pKin, quiet = FALSE) {
 
 #' Custom implementation of opticont
 #' @importFrom dplyr mutate select arrange desc
+#' @importFrom magrittr %>%
+#' @importFrom quadprog solve.QP
+#' 
 #' @param method Optimization method, e.g., "max.BV"
 #' @param cand Object returned by custom_candes
 #' @param con List containing constraints
@@ -320,7 +326,11 @@ custom_noffspring <- function(Candidate, N) {
 }
 
 #' Mate allocation algorithm
-#' @importFrom dplyr filter tibble arrange
+#' @importFrom dplyr filter arrange
+#' @importFrom lpSolve lp.transport
+#' @importFrom tibble tibble
+#' @importFrom magrittr %>%
+#' 
 #' @param Candidate Data frame with columns Indiv, Sex, n
 #' @param Kin Kinship matrix
 #' @param max_pair_kinship Optional numeric threshold
@@ -372,7 +382,7 @@ custom_matings <- function(Candidate, Kin, max_pair_kinship = NULL, quiet = FALS
 
   platform_tag <- tolower(R.version$platform)
   force_greedy <- isTRUE(getOption("allomate.force_greedy_mating", FALSE))
-  detected_webr <- isTRUE(get0("is_webr", inherits = TRUE)) || grepl("emscripten|wasm", platform_tag)
+  detected_webr <- grepl("emscripten|wasm", platform_tag)
   # Always respect the checkbox setting - user choice takes precedence
   # In webR, the checkbox defaults to TRUE in global.R, but user can uncheck it
   use_greedy <- force_greedy
@@ -576,6 +586,8 @@ custom_matings <- function(Candidate, Kin, max_pair_kinship = NULL, quiet = FALS
 
 #' Main OCS function combining all steps
 #' @importFrom dplyr filter
+#' @importFrom magrittr %>%
+#' 
 #' @param candidates_df Data frame of candidate IDs and sex
 #' @param kinship_matrix Kinship matrix
 #' @param ebv_index Vector of estimated breeding values

@@ -38,7 +38,7 @@ app_ui <- function(request) {
       ## ─── Banner ───────────────────────────
       div(
         style = "display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;",
-        tags$img(src = "www/allomate.png", height = "120px", style = "margin-left: 20px;"),
+        tags$img(src = "www/allomate.png", height = "160px", style = "margin-left: 20px;"),
         tags$img(src = "www/logos2.png", style = "width: 67%; height: auto;")
       ),
 
@@ -48,26 +48,19 @@ app_ui <- function(request) {
           # Dynamic startup guide and feedback
           div(
             id = "startup_guide",
-            style = "background-color: #ffffff; border: 1px solid #444444; padding: 10px; margin-bottom: 15px; border-radius: 5px;",
-            h4("🚀 Getting Started"),
+            style = "background-color: #ffffff; border: 2px solid #444444; padding: 15px; margin-bottom: 20px; border-radius: 8px;",
+            h4(tagList(icon("gear"), "Getting Started"), style = "color: #000000; margin-bottom: 15px; border-bottom: 1px solid black; padding-bottom: 8px;"),
             htmlOutput("dynamic_guide"),
-            conditionalPanel(
-              condition = "output.webr_detected",
-              div(
-                style = "background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 8px; margin-top: 10px; border-radius: 3px;",
-                p("🌐 WebR environment detected. Custom OCS fallback will be used since optiSel is not available in WebR.")
-              )
-            ),
             div(
               style = "text-align: center; margin-top: 15px; padding-top: 10px; border-top: 1px solid #dee2e6;",
-              actionButton("help_btn", "❓ Help",
-                           style = "background-color: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 5px;")
+              actionButton("help_btn",tagList((icon("circle-question")),"Help"),
+                           style = "background-color: #FFD700; color: #000000; border:none; padding: 8px 16px; border-radius: 5px;")
             )
           ),
 
           wellPanel(
             style = "background-color: #ffffff; border: 2px solid #444444; padding: 15px; margin-bottom: 20px; border-radius: 8px;",
-            h4("🧬 Core Data Inputs", style = "color: #1565c0; margin-bottom: 15px; border-bottom: 1px solid #2196f3; padding-bottom: 8px;"),
+            h4(tagList(icon("sitemap"), "Core Data Inputs"), style = "color: #000000; margin-bottom: 15px; border-bottom: 1px solid #000000; padding-bottom: 8px;"),
             p("These inputs are used by both Index Generation and OCS calculations:", style = "color: #6c757d; font-size: 12px; margin-bottom: 15px;"),
             h5("Estimate progeny genetic merit"),
             fileInput("candidate_file", "Upload list of candidates",
@@ -82,7 +75,7 @@ app_ui <- function(request) {
 
           wellPanel(
             style = "background-color: #ffffff; border: 2px solid #444444; padding: 15px; margin-bottom: 20px; border-radius: 8px;",
-            h4("⚖️ Weighted EBVs", style = "color: #c62828; margin-bottom: 15px; border-bottom: 1px solid #f44336; padding-bottom: 8px;"),
+            h4(tagList(icon("balance-scale"), " Weighted EBVs"), style = "color: #000000; margin-bottom: 15px; border-bottom: 1px solid #000000; padding-bottom: 8px;"),
             p("Define traits and their relative importance for breeding decisions:", style = "color: #6c757d; font-size: 12px; margin-bottom: 15px;"),
             h5("Traits (EBVs and weights)"),
             uiOutput("trait_inputs"),
@@ -96,7 +89,7 @@ app_ui <- function(request) {
 
           wellPanel(
             style = "background-color: #ffffff; border: 2px solid #444444; padding: 15px; margin-bottom: 20px; border-radius: 8px;",
-            h4("🎯 Optimum Contribution Selection", style = "color: #856404; margin-bottom: 15px; border-bottom: 1px solid #ffeaa7; padding-bottom: 8px;"),
+            h4(tagList(icon("bullseye"), " Optimum Contribution Selection"),style = "color: #000000; margin-bottom: 15px; border-bottom: 1px solid #000000; padding-bottom: 8px;"),
             p("Configure breeding objectives and constraints:", style = "color: #6c757d; font-size: 12px; margin-bottom: 15px;"),
             verbatimTextOutput("package_status_text"),
             h5("Breeding Objectives"),
@@ -113,23 +106,28 @@ app_ui <- function(request) {
                             value = isTRUE(getOption("allomate.force_qp_greedy", FALSE)))
             ),
             actionButton("run_ocs_btn", "Run OCS",
-                         style = "margin-top: 15px; width: 100%; background-color: #856404; color: white; border: none; padding: 10px; border-radius: 5px;")
+                         style = "margin-top: 15px; width: 100%; background-color: #28a745; color: white; border: none; padding: 10px; border-radius: 5px;")
           ),
 
           wellPanel(
             style = "background-color: #ffffff; border: 2px solid #444444; padding: 15px; margin-bottom: 20px; border-radius: 8px;",
-            h4("📊 Export Results", style = "color: #155724; margin-bottom: 15px; border-bottom: 1px solid #c3e6cb; padding-bottom: 8px;"),
-            p("Download all results in a single Excel file with multiple tabs:", style = "color: #6c757d; font-size: 12px; margin-bottom: 15px;"),
-            downloadButton("download_all_results", "📥 Export All Results",
+            h4(tagList(icon("bar-chart"), "Export Results"), style = "color: #000000; margin-bottom: 15px; border-bottom: 1px solid #c3e6cb; padding-bottom: 8px;"),
+            p("Download all results in a single zip file:", style = "color: #6c757d; font-size: 12px; margin-bottom: 15px;"),
+            downloadButton("download_all_results", "Export All Results",
                            style = "width: 100%; background-color: #28a745; color: white; border: none; padding: 10px; border-radius: 5px; margin-bottom: 10px;"),
             div(
               style = "background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 12px; margin-bottom: 10px; border-radius: 5px;",
-              h5("📋 File Status", style = "color: #495057; margin-top: 0; margin-bottom: 10px; font-size: 14px;"),
+              h5(tagList(icon("file"),"File Status"), style = "color: #495057; margin-top: 0; margin-bottom: 10px; font-size: 14px;"),
               htmlOutput("file_status_display")
             ),
-            actionButton("view_r_code_btn", "📝 View R Code",
-                         style = "width: 100%; background-color: #17a2b8; color: white; border: none; padding: 10px; border-radius: 5px;")
-          )
+            tags$a(
+              href = "https://github.com/Breeding-Insight/AlloMate",  
+              target = "_blank",  
+              class = "btn btn-info",
+              style = "width: 100%; background-color: #17a2b8; color: white; 
+                      border: none; padding: 10px; border-radius: 5px; text-align: center;",
+              tagList(icon("github"), "Visit GitHub repository")
+            )) 
         ),
 
         mainPanel(
@@ -159,28 +157,6 @@ app_ui <- function(request) {
                        uiOutput("ocs_solver_note"),
                        br(),
                        DTOutput("ocs_mating_table")
-                     )
-            ),
-            tabPanel("R Code",
-                     div(
-                       style = "padding: 20px; background-color: #f8f9fa; border-radius: 8px; margin: 10px 0; max-height: 80vh; overflow-y: auto; position: relative;",
-                       div(
-                         style = "background-color: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);",
-                         div(
-                           style = "text-align: center; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid #007bff;",
-                           h2("📝 R Code Implementation", style = "color: #007bff; margin-bottom: 10px;"),
-                           p("Complete R code for implementing AlloMate analysis independently", style = "color: #666; font-size: 16px;")
-                         ),
-                         div(
-                           style = "text-align: center; margin-bottom: 20px;",
-                           downloadButton("download_r_code", "📥 Download Complete R Script",
-                                          style = "background-color: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 5px; font-size: 14px;")
-                         ),
-                         div(
-                           style = "line-height: 1.6; font-size: 14px;",
-                           htmlOutput("r_code_content")
-                         )
-                       )
                      )
             ),
             tabPanel("Help",

@@ -3,6 +3,16 @@
 #' @param input,output,session Internal parameters for {shiny}.
 #'     DO NOT REMOVE.
 #' @import shiny
+#' 
+#' @importFrom dplyr filter select mutate pull left_join relocate bind_rows n_distinct
+#' @importFrom magrittr %>%
+#' @importFrom tidyr pivot_longer replace_na 
+#' @importFrom tibble tibble as_tibble column_to_rownames
+#' @importFrom DT datatable formatStyle
+#' @importFrom shinyjs show hide
+#' @importFrom readr read_table
+#' @importFrom openxlsx createWorkbook addWorksheet writeData saveWorkbook
+#' 
 #' @noRd
 app_server <- function(input, output, session) {
 
@@ -16,18 +26,8 @@ app_server <- function(input, output, session) {
     generate_package_status()
   })
 
-  # WebR detection output
-  output$webr_detected <- renderText({
-    if (is_webr_environment()) {
-      "WebR detected"
-    } else {
-      ""
-    }
-  })
-  outputOptions(output, "webr_detected", suspendWhenHidden = FALSE)
 
-  ocs_checkboxes_enabled <- isTRUE(is_webr_environment()) &&
-    !isTRUE(get0("optisel_available", inherits = TRUE, ifnotfound = FALSE))
+  ocs_checkboxes_enabled <- !requireNamespace("optiSel", quietly = TRUE)
 
   output$ocs_checkbox_mode <- renderText({
     if (ocs_checkboxes_enabled) {
@@ -304,18 +304,23 @@ app_server <- function(input, output, session) {
   })
 
   # Export: Prebuild workbook so Chrome downloads reliably
+  # Reactive cache for export
   export_cache <- reactiveVal(NULL)
-
-  generate_export_xlsx <- function(dest_file) {
-    use_openxlsx <- exists("openxlsx_available") && isTRUE(openxlsx_available)
+  
+  # Function to generate ZIP of TSVs
+  generate_export_zip <- function(dest_zip) {
     safe_char <- function(x) if (is.null(x) || length(x) == 0) NA_character_ else as.character(x)
-
+    
+    tmp_dir <- tempfile("export_tsvs")
+    dir.create(tmp_dir)
+    
+    # README
     readme_text <- c(
       "📊 AlloMate Complete Results Report",
       "",
-      "This Excel file contains all results from your AlloMate analysis:",
+      "This TSV collection contains all results from your AlloMate analysis:",
       "",
-      "📋 Worksheets included:",
+      "📋 Files included:",
       "1. README - This overview and explanation",
       "2. Filtered Results - Crosses meeting criteria (positive EBVs, kinship below threshold)",
       "3. EBV Matrix - Complete matrix view with masked values",
@@ -330,42 +335,48 @@ app_server <- function(input, output, session) {
       "",
       "📅 Generated on:", as.character(Sys.Date())
     )
-
+    write.table(data.frame(Text = readme_text, stringsAsFactors = FALSE),
+                file.path(tmp_dir, "README.tsv"), sep="\t", row.names = FALSE, quote = FALSE)
+    
+    # EBV results
     ebv_results <- ebv_results_reactive()
-    mat_for_excel <- NULL
-    filtered_results_df <- NULL
-    ebv_matrix_df <- NULL
-
     if (!is.null(ebv_results)) {
+      # Filtered Results
+      filtered_results_df <- as.data.frame(ebv_results$filt_results_table)
+      write.table(filtered_results_df, file.path(tmp_dir, "Filtered_Results.tsv"),
+                  sep="\t", row.names = TRUE, quote = FALSE)
+      
+      # EBV Matrix
       m_ids <- unique(ebv_results$full_results$Male)
       f_ids <- unique(ebv_results$full_results$Female)
-      mat_for_excel <- matrix(NA_real_, nrow = length(m_ids), ncol = length(f_ids),
-                              dimnames = list(m_ids, f_ids))
-
+      mat_for_csv <- matrix(NA_real_, nrow = length(m_ids), ncol = length(f_ids),
+                            dimnames = list(m_ids, f_ids))
+      
       if (nrow(ebv_results$filt_results_matrix) > 0) {
         for (i in seq_len(nrow(ebv_results$filt_results_matrix))) {
           m <- ebv_results$filt_results_matrix$Male[i]
           f <- ebv_results$filt_results_matrix$Female[i]
           val <- ebv_results$filt_results_matrix$EBV[i]
           if (!is.na(m) && !is.na(f) &&
-              m %in% rownames(mat_for_excel) && f %in% colnames(mat_for_excel)) {
-            mat_for_excel[m, f] <- val
+              m %in% rownames(mat_for_csv) && f %in% colnames(mat_for_csv)) {
+            mat_for_csv[m, f] <- val
           }
         }
       }
-
-      filtered_results_df <- as.data.frame(ebv_results$filt_results_table)
-
-      row_labels <- rownames(mat_for_excel)
-      if (is.null(row_labels)) row_labels <- seq_len(nrow(mat_for_excel))
+      
+      row_labels <- rownames(mat_for_csv)
+      if (is.null(row_labels)) row_labels <- seq_len(nrow(mat_for_csv))
       ebv_matrix_df <- data.frame(
         Male = row_labels,
-        mat_for_excel,
+        mat_for_csv,
         check.names = FALSE,
         stringsAsFactors = FALSE
       )
+      write.table(ebv_matrix_df, file.path(tmp_dir, "EBV_Matrix.tsv"),
+                  sep="\t", row.names = FALSE, quote = FALSE, na = "")
     }
-
+    
+    # OCS results
     formatted_results <- NULL
     if (!is.null(ocs_results_reactive())) {
       formatted_results <- tryCatch(
@@ -375,68 +386,39 @@ app_server <- function(input, output, session) {
           NULL
         }
       )
+      if (!is.null(formatted_results)) {
+        write.table(as.data.frame(formatted_results$candidate_table),
+                    file.path(tmp_dir, "OCS_Candidates.tsv"),
+                    sep="\t", row.names = FALSE, quote = FALSE)
+        write.table(as.data.frame(formatted_results$mating_table),
+                    file.path(tmp_dir, "Mating_Plan.tsv"),
+                    sep="\t", row.names = FALSE, quote = FALSE)
+      }
     }
-
+    
+    # Parameters
     params_data <- data.frame(
-      Parameter = c("Kinship Threshold", "Desired Inbreeding Rate", "Number of Offspring", "Analysis Date"),
+      Parameter = c("Analysis Date", "Kinship Threshold", "Desired Inbreeding Rate", "Number of Offspring"),
       Value = c(
+        as.character(Sys.Date()),
         safe_char(input$thresh),
         safe_char(input$inbreeding_rate),
-        safe_char(input$num_offspring),
-        as.character(Sys.Date())
+        safe_char(input$num_offspring)
       ),
       stringsAsFactors = FALSE
     )
-
-    ok <- FALSE
-    tryCatch({
-      if (use_openxlsx) {
-        wb <- openxlsx::createWorkbook()
-
-        openxlsx::addWorksheet(wb, "README")
-        openxlsx::writeData(wb, "README", readme_text)
-
-        if (!is.null(ebv_results)) {
-          openxlsx::addWorksheet(wb, "Filtered Results")
-          openxlsx::writeData(wb, "Filtered Results", filtered_results_df, rowNames = TRUE)
-
-          openxlsx::addWorksheet(wb, "EBV Matrix")
-          openxlsx::writeData(wb, "EBV Matrix", ebv_matrix_df, rowNames = FALSE)
-        }
-
-        if (!is.null(formatted_results)) {
-          openxlsx::addWorksheet(wb, "OCS Candidates")
-          openxlsx::writeData(wb, "OCS Candidates", formatted_results$candidate_table, rowNames = FALSE)
-
-          openxlsx::addWorksheet(wb, "Mating Plan")
-          openxlsx::writeData(wb, "Mating Plan", formatted_results$mating_table, rowNames = FALSE)
-        }
-
-        openxlsx::addWorksheet(wb, "Parameters")
-        openxlsx::writeData(wb, "Parameters", params_data, rowNames = FALSE)
-
-        openxlsx::saveWorkbook(wb, dest_file, overwrite = TRUE)
-      } else {
-        sheets <- list(
-          README = data.frame(Text = readme_text, stringsAsFactors = FALSE),
-          Parameters = params_data
-        )
-        if (!is.null(filtered_results_df)) sheets$`Filtered Results` <- filtered_results_df
-        if (!is.null(ebv_matrix_df)) sheets$`EBV Matrix` <- ebv_matrix_df
-        if (!is.null(formatted_results)) {
-          sheets$`OCS Candidates` <- as.data.frame(formatted_results$candidate_table)
-          sheets$`Mating Plan` <- as.data.frame(formatted_results$mating_table)
-        }
-        write_xlsx_pure(dest_file, sheets)
-      }
-      ok <- TRUE
-    }, error = function(e) {
-      message("Export error: ", e$message)
-      writeLines(paste("Export failed:", e$message), dest_file, useBytes = TRUE)
-    })
-    ok
+    write.table(params_data, file.path(tmp_dir, "Parameters.tsv"),
+                sep="\t", row.names = FALSE, quote = FALSE)
+    
+    # Create ZIP using relative paths
+    tsv_files <- list.files(tmp_dir)  # relative file names
+    zip::zip(zipfile = dest_zip, files = tsv_files, root = tmp_dir)
+    
+    unlink(tmp_dir, recursive = TRUE)
+    TRUE
   }
-
+  
+  # Observer to automatically export ZIP
   observeEvent({
     list(
       ebv_results_reactive(),
@@ -446,13 +428,12 @@ app_server <- function(input, output, session) {
       input$num_offspring
     )
   }, {
-    tmp <- tempfile(pattern = "allomate_export_", fileext = ".xlsx")
-    if (generate_export_xlsx(tmp) && file.exists(tmp) && file.info(tmp)$size > 0) {
+    tmp_zip <- tempfile(pattern = "allomate_export_", fileext = ".zip")
+    
+    if (generate_export_zip(tmp_zip) && file.exists(tmp_zip)) {
       old <- export_cache()
-      export_cache(tmp)
+      export_cache(tmp_zip)
       if (!is.null(old) && file.exists(old)) unlink(old, force = TRUE)
-    } else if (file.exists(tmp)) {
-      unlink(tmp, force = TRUE)
     }
   }, ignoreNULL = FALSE)
 
@@ -463,7 +444,7 @@ app_server <- function(input, output, session) {
 
   output$download_all_results <- downloadHandler(
     filename = function() {
-      paste0("AlloMate_Complete_Results-", Sys.Date(), ".xlsx")
+      paste0("AlloMate_results-", Sys.Date(), ".zip")
     },
     content = function(file) {
       cache <- export_cache()
@@ -1120,18 +1101,6 @@ app_server <- function(input, output, session) {
   observeEvent(input$run_ocs_btn, {
     req(input$pedigree_file, input$candidate_file)
 
-    # Check if any OCS implementation is available (optiSel or custom fallback)
-    if ((!exists("optisel_available") || !optisel_available) &&
-        (!exists("custom_ocs_available") || !custom_ocs_available)) {
-      showModal(modalDialog(
-        title = "OCS Functionality Not Available",
-        "Neither optiSel nor the custom OCS fallback could be loaded.
-        Please check that all required packages are installed and restart the app.",
-        easyClose = TRUE
-      ))
-      return(NULL)
-    }
-
     if (ocs_checkboxes_enabled) {
       options(allomate.force_greedy_mating = isTRUE(input$force_greedy_mating))
       options(allomate.force_qp_greedy = isTRUE(input$force_qp_greedy))
@@ -1149,7 +1118,7 @@ app_server <- function(input, output, session) {
       candidates <- read.table(input$candidate_file$datapath, header = TRUE, stringsAsFactors = FALSE)
 
       final_ped <- clean_pedigree(ped_data)
-      kinship_matrix <- if (exists("kinship2_available") && kinship2_available) {
+      kinship_matrix <- if (requireNamespace("kinship2", quietly = TRUE)) {
         kinship2::kinship(final_ped)
       } else {
         fallback_kinship(final_ped)
@@ -1290,212 +1259,5 @@ app_server <- function(input, output, session) {
     text <- gsub("'", "&#39;", text)
     return(text)
   }
-
-  # Function to read and format R code files
-  format_r_code_content <- function() {
-    # Define the R files to include
-    r_files <- c(
-      "global.R" = "Global Setup and Package Loading",
-      "R/load_functions.R" = "Function Loading Logic",
-      "R/utils.R" = "Data Processing Functions",
-      "R/ocs_helpers.R" = "OCS Calculation Functions",
-      "R/ui_helpers.R" = "UI Helper Functions",
-      "R/optsel_fallback.R" = "Custom OCS Implementation"
-    )
-
-    # Determine the base path
-    base_path <- if (app_dir) "." else "app"
-
-    # Read and format each file
-    formatted_sections <- list()
-
-    for (file_path in names(r_files)) {
-      full_path <- file.path(base_path, file_path)
-
-      if (file.exists(full_path)) {
-        tryCatch({
-          file_content <- readLines(full_path, warn = FALSE, encoding = "UTF-8")
-          file_content <- paste(file_content, collapse = "\n")
-
-          # Create formatted section
-          section_html <- paste0(
-            '<div class="code-section">',
-            '<h4>📁 ', r_files[file_path], '</h4>',
-            '<div class="file-info">',
-            '<strong>File:</strong> ', file_path, '<br>',
-            '<strong>Lines:</strong> ', length(strsplit(file_content, "\n")[[1]]), '<br>',
-            '<strong>Description:</strong> ', r_files[file_path],
-            '</div>',
-            '<pre><code class="language-r">',
-            htmlEscape(file_content),
-            '</code></pre>',
-            '</div>'
-          )
-
-          formatted_sections[[file_path]] <- section_html
-        }, error = function(e) {
-          formatted_sections[[file_path]] <- paste0(
-            '<div class="code-section">',
-            '<h4>❌ Error reading file</h4>',
-            '<p>Could not read file: ', file_path, '</p>',
-            '<p>Error: ', e$message, '</p>',
-            '</div>'
-          )
-        })
-      } else {
-        formatted_sections[[file_path]] <- paste0(
-          '<div class="code-section">',
-          '<h4>❌ File not found</h4>',
-          '<p>File not found: ', file_path, '</p>',
-          '</div>'
-        )
-      }
-    }
-
-    # Create setup instructions
-    setup_instructions <- paste0(
-      '<div class="setup-instructions">',
-      '<h4>🚀 Setup Instructions</h4>',
-      '<p><strong>To run this analysis independently in R:</strong></p>',
-      '<ol>',
-      '<li><strong>Install required packages:</strong><br>',
-      '<code>install.packages(c("tidyverse", "shiny", "DT", "openxlsx", "quadprog", "kinship2", "optiSel"))</code></li>',
-      '<li><strong>Load the code files:</strong> Copy the code sections above into separate .R files</li>',
-      '<li><strong>Prepare your data:</strong> Ensure your input files match the expected format</li>',
-      '<li><strong>Run the analysis:</strong> Execute the functions in the order shown above</li>',
-      '</ol>',
-      '<p><strong>Note:</strong> The custom OCS fallback will be used if optiSel is not available.</p>',
-      '</div>'
-    )
-
-    # Combine all sections
-    full_content <- paste0(
-      '<div class="r-code-content">',
-      '<h1>🧬 AlloMate R Code Implementation</h1>',
-      '<p>This page contains all the R code needed to implement the AlloMate analysis independently. ',
-      'The code is organized by function and includes all necessary data processing, kinship calculations, ',
-      'and optimum contribution selection algorithms.</p>',
-      setup_instructions,
-      paste(formatted_sections, collapse = ""),
-      '</div>'
-    )
-
-    return(full_content)
-  }
-
-  # Render R code content
-  output$r_code_content <- renderUI({
-    HTML(format_r_code_content())
-  })
-
-  # Download R code functionality
-  output$download_r_code <- downloadHandler(
-    filename = function() {
-      paste0("allomate_complete_script_", format(Sys.Date(), "%Y%m%d"), ".R")
-    },
-    content = function(file) {
-      # Define the R files to include
-      r_files <- c(
-        "global.R" = "# Global Setup and Package Loading",
-        "R/load_functions.R" = "# Function Loading Logic",
-        "R/utils.R" = "# Data Processing Functions",
-        "R/ocs_helpers.R" = "# OCS Calculation Functions",
-        "R/ui_helpers.R" = "# UI Helper Functions",
-        "R/optsel_fallback.R" = "# Custom OCS Implementation"
-      )
-
-      # Determine the base path
-      base_path <- if (app_dir) "." else "app"
-
-      # Create the complete script
-      script_lines <- c(
-        "# AlloMate Complete R Script",
-        "# Generated on:", as.character(Sys.Date()),
-        "# This script contains all functions needed to run AlloMate analysis independently",
-        "",
-        "# =============================================================================",
-        "# SETUP INSTRUCTIONS",
-        "# =============================================================================",
-        "# 1. Install required packages:",
-        "#    install.packages(c('tidyverse', 'shiny', 'DT', 'openxlsx', 'quadprog', 'kinship2', 'optiSel'))",
-        "# 2. Load required libraries:",
-        "#    library(tidyverse)",
-        "#    library(openxlsx)",
-        "#    library(quadprog)",
-        "#    library(kinship2)",
-        "#    library(optiSel)",
-        "# 3. Run this script to load all functions",
-        "# 4. Use the functions as demonstrated in the comments",
-        "",
-        "# =============================================================================",
-        "# FUNCTION DEFINITIONS",
-        "# =============================================================================",
-        ""
-      )
-
-      for (file_path in names(r_files)) {
-        full_path <- file.path(base_path, file_path)
-
-        if (file.exists(full_path)) {
-          tryCatch({
-            file_content <- readLines(full_path, warn = FALSE, encoding = "UTF-8")
-
-            # Add section header
-            script_lines <- c(script_lines,
-                              paste0("# ", "=", strrep("=", 70)),
-                              r_files[file_path],
-                              paste0("# ", "=", strrep("=", 70)),
-                              "",
-                              file_content,
-                              "",
-                              ""
-            )
-          }, error = function(e) {
-            script_lines <- c(script_lines,
-                              paste0("# Error reading file: ", file_path),
-                              paste0("# ", e$message),
-                              "",
-                              ""
-            )
-          })
-        } else {
-          script_lines <- c(script_lines,
-                            paste0("# File not found: ", file_path),
-                            "",
-                            ""
-          )
-        }
-      }
-
-      # Add usage example
-      script_lines <- c(script_lines,
-                        "# =============================================================================",
-                        "# USAGE EXAMPLE",
-                        "# =============================================================================",
-                        "# ",
-                        "# # Load your data",
-                        "# candidates <- read.table('your_candidates.txt', header = TRUE)",
-                        "# pedigree <- read.table('your_pedigree.txt', header = TRUE)",
-                        "# ",
-                        "# # Process data",
-                        "# candidates_data <- read_candidates(list(datapath = 'your_candidates.txt'))",
-                        "# final_ped <- clean_pedigree(pedigree)",
-                        "# kinship_matrix <- compute_kinship_matrix(final_ped, candidates_data$males, candidates_data$females)",
-                        "# ",
-                        "# # Run OCS analysis",
-                        "# results <- run_ocs(candidates_df = candidates, kinship_matrix = kinship_matrix$results,",
-                        "#                    ebv_index = your_ebv_values, desired_inbreeding_rate = 0.05, num_offspring = 100)",
-                        "# ",
-                        "# # View results",
-                        "# print(results)",
-                        ""
-      )
-
-      # Write to file
-      writeLines(script_lines, file)
-    }
-  )
-
-
 }
 

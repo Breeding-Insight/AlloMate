@@ -1,6 +1,6 @@
 Package: AlloMate
 Title: An Amazing Shiny App
-Version: 0.0.0.9000
+Version: 0.0.0.9001
 Authors@R: 
     person(given = "firstname",
            family = "lastname",
@@ -11,10 +11,22 @@ License: Apache License (>= 2)
 Imports: 
     config,
     golem,
-    shiny
+    shiny,
+    DT,
+    dplyr,
+    lpSolve,
+    magrittr,
+    purrr,
+    readr,
+    shinyjs,
+    tibble,
+    tidyr,
+    quadprog
 Encoding: UTF-8
 LazyData: true
 RoxygenNote: 7.3.3
 Suggests: 
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    kinship2,
+    optiSel
 Config/testthat/edition: 3

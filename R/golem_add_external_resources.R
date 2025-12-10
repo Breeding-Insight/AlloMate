@@ -10,13 +10,16 @@ golem_add_external_resources <- function() {
   
   # Map the 'www' URL in the app to the package folder
   add_resource_path(
-    "www", system.file("inst/app/www", package = "AlloMate")
+    "www", app_sys("app/www")
   )
   
   # Include resources in the UI
   tags$head(
+    # Browser tab title
+    tags$title("AlloMate"),
+    
     # Favicon
-    tags$link(rel = "shortcut icon", href = "www/favicon.ico"),
+    tags$link(rel = "shortcut icon", href = "www/allomate.png"),
     
     # Custom CSS
     tags$link(rel = "stylesheet", type = "text/css", href = "www/custom.css"),
