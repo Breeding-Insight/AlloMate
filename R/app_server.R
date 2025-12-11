@@ -344,7 +344,7 @@ app_server <- function(input, output, session) {
       # Filtered Results
       filtered_results_df <- as.data.frame(ebv_results$filt_results_table)
       write.table(filtered_results_df, file.path(tmp_dir, "Filtered_Results.tsv"),
-                  sep="\t", row.names = TRUE, quote = FALSE)
+                  sep="\t", row.names = F, quote = FALSE)
       
       # EBV Matrix
       m_ids <- unique(ebv_results$full_results$Male)
