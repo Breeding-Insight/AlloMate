@@ -5,6 +5,6 @@ account: breedinginsight
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 16295862
-bundleId: 11310088
+bundleId: 11310337
 url: https://breedinginsight.shinyapps.io/AlloMate/
 version: 1
