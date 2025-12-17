@@ -1,10 +1,10 @@
 # AlloMate - Genetic Breeding Optimization App
 
-## 🧬 Overview
+## Overview
 
 AlloMate is a Shiny web application for genetic breeding optimization using Optimum Contribution Selection (OCS). The app helps breeders make informed decisions about mate selection and breeding strategies by analyzing kinship relationships and breeding values.
 
-## 🚀 Features
+## Features
 
 ### Core Functionality
 - **Kinship Analysis**: Calculate and visualize kinship relationships between potential mates
@@ -19,7 +19,7 @@ AlloMate is a Shiny web application for genetic breeding optimization using Opti
 - **Modular Design**: Clean, organized codebase for easy maintenance
 - **Robust Error Handling**: Comprehensive validation and user feedback
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 AlloMate/
@@ -53,7 +53,7 @@ AlloMate/
 └── README.md
 ```
 
-## 🛠️ Installation
+## Installation
 
 ### Prerequisites
 - R (version 4.0 or higher)
@@ -109,7 +109,7 @@ update.packages(ask = FALSE)
 ### WebR Deployment
 The app is compatible with WebR environments and will automatically use the custom OCS fallback when optiSel is not available.
 
-## 📊 Usage
+## Usage
 
 ### 1. Upload Data
 - **Candidates File**: Upload a text file with columns `id` and `sex` (M/F)
@@ -185,7 +185,7 @@ With the provided sample data:
 - **Mean offspring inbreeding**: 0.0053
 - **Expected genetic gain**: +0.0557 (improved from -0.0290 baseline)
 
-## 🔍 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -216,7 +216,7 @@ With the provided sample data:
 ### Debug Mode
 Enable verbose output by checking the R console for detailed messages during analysis.
 
-## 🏗️ Code Organization
+## Code Organization
 
 ### Function Structure
 The app uses an organized functions structure to improve code maintainability, reusability, and clarity:
@@ -244,7 +244,7 @@ The app uses an organized functions structure to improve code maintainability, r
 - **Documentation**: Each function file has clear documentation
 - **Collaboration**: Multiple developers can work on different function files
 
-## 🤝 Contributing
+## Contributing
 
 ### Code Organization
 - Follow the established project structure
@@ -269,14 +269,14 @@ All functions include Roxygen2 documentation with:
 
 This project is developed for genetic breeding optimization research and applications.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Built with R and Shiny
 - Uses kinship2 for pedigree analysis
 - Custom OCS implementation for WebR compatibility
 - Sample data provided for testing and demonstration
 
-## 📞 Support
+## Support
 
 For questions or issues:
 1. Check the troubleshooting section
