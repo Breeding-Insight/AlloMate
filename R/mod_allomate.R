@@ -170,8 +170,9 @@ mod_allomate_ui <- function(id) {
       ),
 
       shiny::mainPanel(
-        shiny::tabsetPanel(
+        bs4Dash::tabsetPanel(
           id = ns("main_tabs"),
+          type = "tabs",
           shiny::tabPanel(
             "Kinship and EBV",
             shiny::verbatimTextOutput(ns("message1")),
