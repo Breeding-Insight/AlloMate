@@ -9,17 +9,19 @@ app_ui <- function(request) {
     golem_add_external_resources(),
     bs4Dash::bs4DashPage(
       title = "AlloMate",
-      skin = "light",
+      skin = "black",
       bs4Dash::bs4DashNavbar(
         title = shiny::tagList(
           shiny::tags$img(
             src = "www/allomate.png",
-            height = "30",
+            height = "45",
+            width = '45',
             style = "margin-right: 8px;"
           ),
           shiny::span("AlloMate")
         )
       ),
+      help=NULL,
       bs4Dash::bs4DashSidebar(
         skin = "light",
         status = "danger",
