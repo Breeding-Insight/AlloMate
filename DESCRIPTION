@@ -9,14 +9,18 @@ Authors@R:
 Description: What the package does (one paragraph).
 License: Apache License (>= 2)
 Imports: 
+    bs4Dash,
     config,
     golem,
     shiny,
+    shinydisconnect,
     DT,
     dplyr,
     lpSolve,
     magrittr,
+    openxlsx,
     purrr,
+    zip,
     readr,
     shinyjs,
     tibble,

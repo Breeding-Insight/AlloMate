@@ -1,1 +1,1 @@
-source("renv/activate.R")
+# renv removed: dependencies are defined by DESCRIPTION
