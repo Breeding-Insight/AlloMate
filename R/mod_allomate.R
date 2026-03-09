@@ -215,6 +215,7 @@ mod_allomate_ui <- function(id) {
 #' @noRd
 mod_allomate_server <- function(id, parent_session) {
   shiny::moduleServer(id, function(input, output, session) {
+      ns <- session$ns
       missing_id_data <- reactiveValues(
         candidates = character(),
         ebvs = character()
@@ -398,7 +399,7 @@ mod_allomate_server <- function(id, parent_session) {
       }, ignoreNULL = FALSE)
 
       session$onSessionEnded(function() {
-        cache <- export_cache()
+        cache <- shiny::isolate(export_cache())
         if (!is.null(cache) && file.exists(cache)) unlink(cache, force = TRUE)
       })
 
@@ -407,14 +408,14 @@ mod_allomate_server <- function(id, parent_session) {
           paste0("AlloMate_results-", Sys.Date(), ".zip")
         },
         content = function(file) {
-          cache <- export_cache()
+          cache <- shiny::isolate(export_cache())
           if (!is.null(cache) && file.exists(cache)) {
             file.copy(cache, file, overwrite = TRUE)
           } else {
             generate_export_xlsx(file)
           }
         },
-        contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        contentType = "application/zip"
       )
       outputOptions(output, "download_all_results", suspendWhenHidden = FALSE)
 
@@ -690,13 +691,13 @@ mod_allomate_server <- function(id, parent_session) {
       })
 
       output$trait_inputs <- renderUI({
-        create_trait_inputs(trait_counter())
+        create_trait_inputs(trait_counter(), ns = ns)
       })
 
       # OCS trait inputs
       output$ocs_trait_inputs <- renderUI({
         req(input$ocs_trait_counter)
-        create_ocs_trait_inputs(input$ocs_trait_counter)
+        create_ocs_trait_inputs(input$ocs_trait_counter, ns = ns)
       })
 
       candidates_data <- reactive({
@@ -748,8 +749,8 @@ mod_allomate_server <- function(id, parent_session) {
           kinship_res <- compute_kinship_matrix(final_ped, males, females)
 
           output$quadrants_table <- DT::renderDT({
-            datatable(kinship_res$quads, options = list(ordering = FALSE, dom = "t"), rownames = TRUE) %>%
-              formatStyle(colnames(kinship_res$quads), styleEqual(
+            DT::datatable(kinship_res$quads, options = list(ordering = FALSE, dom = "t"), rownames = TRUE) %>%
+              DT::formatStyle(colnames(kinship_res$quads), styleEqual(
                 kinship_res$quads[1, ], c("lightgreen", "yellow", "orange", "coral")
               ))
           })
@@ -911,17 +912,17 @@ mod_allomate_server <- function(id, parent_session) {
         }
 
         quads_combined <- if (!is.null(pedigree_data())) {
-          bind_rows(pedigree_data()$quads, ebv_quads)
+          dplyr::bind_rows(pedigree_data()$quads, ebv_quads)
         } else {
           ebv_quads
         }
 
         output$quadrants_table <- DT::renderDT({
-          datatable(quads_combined, options = list(ordering = FALSE, dom = "t"), rownames = TRUE) %>%
-            formatStyle("Q25", backgroundColor = "coral") %>%
-            formatStyle("Q50", backgroundColor = "orange") %>%
-            formatStyle("Q75", backgroundColor = "yellow") %>%
-            formatStyle("Q100", backgroundColor = "lightgreen")
+          DT::datatable(quads_combined, options = list(ordering = FALSE, dom = "t"), rownames = TRUE) %>%
+            DT::formatStyle("Q25", backgroundColor = "coral") %>%
+            DT::formatStyle("Q50", backgroundColor = "orange") %>%
+            DT::formatStyle("Q75", backgroundColor = "yellow") %>%
+            DT::formatStyle("Q100", backgroundColor = "lightgreen")
         })
 
         # Filter out crosses with EBV <= 0 or kinship >= threshold
@@ -941,10 +942,10 @@ mod_allomate_server <- function(id, parent_session) {
         ))
 
         output$matrix <- DT::renderDT({
-          dt <- datatable(filt_results_table, rownames = TRUE)
+          dt <- DT::datatable(filt_results_table, rownames = TRUE)
           if (valid_pairs && nrow(filt_results_table) > 0) {
             dt <- dt %>%
-              formatStyle("EBV", styleInterval(
+              DT::formatStyle("EBV", styleInterval(
                 unlist(ebv_quads[1, c("Q25", "Q50", "Q75")]),
                 c("coral", "orange", "yellow", "lightgreen")
               ))
@@ -982,7 +983,7 @@ mod_allomate_server <- function(id, parent_session) {
             tags$p(
               "❗",
               candidate_text,
-              downloadLink("download_missing_candidates", "view here"),
+              downloadLink(ns("download_missing_candidates"), "view here"),
               "."
             )
           ))
@@ -1189,7 +1190,7 @@ mod_allomate_server <- function(id, parent_session) {
         }
 
         mating_tbl %>%
-          datatable(
+          DT::datatable(
             options = list(pageLength = 10, autoWidth = TRUE),
             rownames = FALSE
           )
