@@ -4,10 +4,12 @@
 \alias{create_trait_inputs}
 \title{Create dynamic trait input UI}
 \usage{
-create_trait_inputs(n)
+create_trait_inputs(n, ns = function(id) id)
 }
 \arguments{
 \item{n}{Number of traits}
+
+\item{ns}{Namespace function for module-safe input IDs}
 }
 \value{
 UI elements for trait inputs
