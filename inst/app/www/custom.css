@@ -1,0 +1,36 @@
+.toc-container {
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.toc-link {
+  color: #007bff;
+  text-decoration: none;
+}
+
+.toc-link:hover {
+  text-decoration: underline;
+}
+
+.help-content {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.ocs-spinner {
+  width: 44px;
+  height: 44px;
+  border: 4px solid rgba(0, 0, 0, 0.15);
+  border-top-color: #28a745;
+  border-radius: 50%;
+  animation: allomate-spin 0.9s linear infinite;
+}
+
+@keyframes allomate-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+

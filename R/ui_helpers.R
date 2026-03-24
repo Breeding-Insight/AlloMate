@@ -4,13 +4,14 @@
 #' Create dynamic trait input UI
 #' @importFrom shiny tagList wellPanel fileInput numericInput fluidRow column
 #' @param n Number of traits
+#' @param ns Namespace function for module-safe input IDs
 #' @return UI elements for trait inputs
-create_trait_inputs <- function(n) {
+create_trait_inputs <- function(n, ns = function(id) id) {
   tagList(
     lapply(seq_len(n), function(i) {
       wellPanel(
-        fileInput(paste0("trait_file_", i), paste("EBVs for trait", i)),
-        numericInput(paste0("trait_weight_", i), paste("Relative weight for Trait", i),
+        fileInput(ns(paste0("trait_file_", i)), paste("EBVs for trait", i)),
+        numericInput(ns(paste0("trait_weight_", i)), paste("Relative weight for Trait", i),
                      value = round(1 / n, 3), min = 0, max = 1, step = 0.01)
       )
     })
@@ -20,12 +21,13 @@ create_trait_inputs <- function(n) {
 #' Create OCS trait input UI
 #' @importFrom shiny fileInput numericInput fluidRow column
 #' @param n Number of traits
+#' @param ns Namespace function for module-safe input IDs
 #' @return UI elements for OCS trait inputs
-create_ocs_trait_inputs <- function(n) {
+create_ocs_trait_inputs <- function(n, ns = function(id) id) {
   lapply(1:n, function(i) {
     fluidRow(
-      column(6, fileInput(paste0("ocs_trait_file_", i), paste("Upload EBV File", i))),
-      column(6, numericInput(paste0("ocs_trait_weight_", i), paste("Weight for Trait", i),
+      column(6, fileInput(ns(paste0("ocs_trait_file_", i)), paste("Upload EBV File", i))),
+      column(6, numericInput(ns(paste0("ocs_trait_weight_", i)), paste("Weight for Trait", i),
                              value = round(1 / n, 2), min = 0, max = 1, step = 0.01))
     )
   })
