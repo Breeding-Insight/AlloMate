@@ -5,7 +5,7 @@ account: bi-science
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 16380036
-bundleId: 11407790
+bundleId: 11754774
 url: https://bi-science.shinyapps.io/AlloMate/
 version: 1
 asMultiple: FALSE

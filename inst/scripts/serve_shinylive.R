@@ -28,11 +28,6 @@ cat(sprintf("Serving %s at http://%s:%d\n", dir_to_serve, host, port))
 # Start server
 srv <- httpuv::runStaticServer(dir_to_serve, port = port, host = host)
 
-# Open in editor mode to show code alongside the app
-url <- sprintf("http://%s:%d/AlloMate/edit/", host, port)
-cat(sprintf("Opening in editor mode: %s\n", url))
-try(utils::browseURL(url), silent = TRUE)
-
 # Keep the process alive
 repeat Sys.sleep(3600)
 
