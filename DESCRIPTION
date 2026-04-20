@@ -28,6 +28,7 @@ Imports:
     zip,
     readr,
     shinyjs,
+    shinyWidgets,
     tibble,
     tidyr,
     quadprog

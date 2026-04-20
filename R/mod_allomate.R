@@ -151,7 +151,7 @@ mod_allomate_ui <- function(id) {
         )
       ),
       shiny::mainPanel(
-        # ── Status box ────────────────────────────────────────────────────
+        # ── Status box ──────────────────────────────────────────────────
         shiny::fluidRow(
           shiny::column(
             width = 12,
@@ -229,14 +229,17 @@ mod_allomate_server <- function(id, parent_session) {
     # ── Package status ───────────────────────────────────────────────────
     output$package_status_text <- shiny::renderText({ generate_package_status() })
     
-    ocs_checkboxes_enabled <- !requireNamespace("optiSel", quietly = TRUE)
+    # Fix: flipped logic — checkboxes enabled when optiSel IS available
+    optisel_available      <- requireNamespace("optiSel", quietly = TRUE)
+    ocs_checkboxes_enabled <- optisel_available
     
     output$ocs_checkbox_mode <- shiny::renderText({
       if (ocs_checkboxes_enabled) "1" else ""
     })
     shiny::outputOptions(output, "ocs_checkbox_mode", suspendWhenHidden = FALSE)
     
-    if (!ocs_checkboxes_enabled) {
+    # Fix: reset options when optiSel IS available (was !ocs_checkboxes_enabled)
+    if (optisel_available) {
       options(allomate.force_greedy_mating = FALSE, allomate.force_qp_greedy = FALSE)
     }
     
@@ -497,16 +500,16 @@ mod_allomate_server <- function(id, parent_session) {
       
       download_status <- if (has_error) {
         "<div style='background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 8px; margin-top: 10px; border-radius: 3px;'>
-           <p style='color: #721c24; margin: 0; font-size: 12px;'><strong>Error detected.</strong> Check the startup guide above for details.</p>
-         </div>"
+        <p style='color: #721c24; margin: 0; font-size: 12px;'><strong>Error detected.</strong> Check the startup guide above for details.</p>
+        </div>"
       } else if (all_ready) {
         "<div style='background-color: #d4edda; border: 1px solid #c3e6cb; padding: 8px; margin-top: 10px; border-radius: 3px;'>
-           <p style='color: #155724; margin: 0; font-size: 12px;'><strong>Download ready.</strong> All core data is available.</p>
-         </div>"
+        <p style='color: #155724; margin: 0; font-size: 12px;'><strong>Download ready.</strong> All core data is available.</p>
+        </div>"
       } else {
         "<div style='background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 8px; margin-top: 10px; border-radius: 3px;'>
-           <p style='color: #6c757d; margin: 0; font-size: 12px;'>Upload required files to enable download.</p>
-         </div>"
+        <p style='color: #6c757d; margin: 0; font-size: 12px;'>Upload required files to enable download.</p>
+        </div>"
       }
       
       shiny::HTML(paste0(
@@ -632,7 +635,7 @@ mod_allomate_server <- function(id, parent_session) {
         missing_female_ids    <- intersect(missing_candidate_ids, females)
         remaining_missing_ids <- setdiff(missing_candidate_ids, c(missing_male_ids, missing_female_ids))
         
-        cleaned_ped$stats$missing_candidates   <- missing_candidates
+        cleaned_ped$stats$missing_candidates    <- missing_candidates
         cleaned_ped$stats$missing_candidate_ids <- missing_candidate_ids
         
         kinship_res <- compute_kinship_matrix(final_ped, males, females)
@@ -697,7 +700,7 @@ mod_allomate_server <- function(id, parent_session) {
     
     shiny::observe({
       if (is.null(ebv_data())) {
-        output$message2           <- shiny::renderUI(NULL)
+        output$message2             <- shiny::renderUI(NULL)
         output$candidate_ebv_status <- shiny::renderUI(NULL)
       }
     })
@@ -728,9 +731,9 @@ mod_allomate_server <- function(id, parent_session) {
       males   <- candidates_data()$males
       females <- candidates_data()$females
       
-      ebv_ids              <- unique(joint_ebvs$ID)
-      ebv_only_ids         <- setdiff(ebv_ids, cands$id)
-      joint_ebvs_filtered  <- joint_ebvs %>% dplyr::filter(ID %in% cands$id)
+      ebv_ids             <- unique(joint_ebvs$ID)
+      ebv_only_ids        <- setdiff(ebv_ids, cands$id)
+      joint_ebvs_filtered <- joint_ebvs %>% dplyr::filter(ID %in% cands$id)
       
       cand_ebv <- dplyr::left_join(cands, joint_ebvs_filtered, by = c("id" = "ID")) %>%
         dplyr::select(id, sex, index_val)
