@@ -151,7 +151,7 @@ mod_allomate_ui <- function(id) {
         )
       ),
       shiny::mainPanel(
-        # ── Status box ──────────────────────────────────────────────────
+        #  Status box
         shiny::fluidRow(
           shiny::column(
             width = 12,
@@ -226,10 +226,9 @@ mod_allomate_server <- function(id, parent_session) {
       ebvs       = character()
     )
     
-    # ── Package status ───────────────────────────────────────────────────
+    #  Package status
     output$package_status_text <- shiny::renderText({ generate_package_status() })
     
-    # Fix: flipped logic — checkboxes enabled when optiSel IS available
     optisel_available      <- requireNamespace("optiSel", quietly = TRUE)
     ocs_checkboxes_enabled <- optisel_available
     
@@ -243,7 +242,7 @@ mod_allomate_server <- function(id, parent_session) {
       options(allomate.force_greedy_mating = FALSE, allomate.force_qp_greedy = FALSE)
     }
     
-    # ── Help button ───────────────────────────────────────────────────────
+    #  Help button─
     shiny::observeEvent(input$help_btn, {
       bs4Dash::updatebs4TabItems(
         session = parent_session, inputId = "MainMenu", selected = "help"
@@ -259,7 +258,7 @@ mod_allomate_server <- function(id, parent_session) {
     
     ebv_data <- shiny::reactive({ process_ebvs(trait_counter(), input) })
     
-    # ── Export cache ──────────────────────────────────────────────────────
+    #  Export cache
     export_cache <- shiny::reactiveVal(NULL)
     
     generate_export_zip <- function(dest_zip) {
@@ -379,7 +378,7 @@ mod_allomate_server <- function(id, parent_session) {
     )
     shiny::outputOptions(output, "download_all_results", suspendWhenHidden = FALSE)
     
-    # ── Dynamic startup guide ─────────────────────────────────────────────
+    #  Dynamic startup guide
     output$dynamic_guide <- shiny::renderUI({
       current_error <- error_message()
       
@@ -439,7 +438,7 @@ mod_allomate_server <- function(id, parent_session) {
       shiny::HTML(paste(steps, collapse = ""))
     })
     
-    # ── File status display ───────────────────────────────────────────────
+    #  File status display
     output$file_status_display <- shiny::renderUI({
       has_candidates <- !is.null(input$candidate_file)
       has_pedigree   <- !is.null(input$pedigree_file)
@@ -520,7 +519,7 @@ mod_allomate_server <- function(id, parent_session) {
       ))
     })
     
-    # ── Pedigree status display ───────────────────────────────────────────
+    #  Pedigree status display ─
     output$pedigree_status_display <- shiny::renderUI({
       stats <- pedigree_validation_stats()
       if (is.null(stats)) return(NULL)
@@ -573,7 +572,7 @@ mod_allomate_server <- function(id, parent_session) {
       shiny::HTML(paste0(green_box, yellow_box, red_box))
     })
     
-    # ── Trait counter ─────────────────────────────────────────────────────
+    #  Trait counter
     shiny::observeEvent(input$add_trait,    { trait_counter(trait_counter() + 1) })
     shiny::observeEvent(input$remove_trait, { if (trait_counter() > 1) trait_counter(trait_counter() - 1) })
     
@@ -584,7 +583,7 @@ mod_allomate_server <- function(id, parent_session) {
       create_ocs_trait_inputs(input$ocs_trait_counter, ns = ns)
     })
     
-    # ── Candidates ────────────────────────────────────────────────────────
+    #  Candidates
     candidates_data <- shiny::reactive({
       shiny::req(input$candidate_file)
       tryCatch({
@@ -609,7 +608,7 @@ mod_allomate_server <- function(id, parent_session) {
       })
     })
     
-    # ── Pedigree ──────────────────────────────────────────────────────────
+    #  Pedigree
     pedigree_data <- shiny::reactiveVal(NULL)
     
     shiny::observeEvent(input$pedigree_file, {
@@ -713,7 +712,7 @@ mod_allomate_server <- function(id, parent_session) {
       }
     })
     
-    # ── EBV observe ───────────────────────────────────────────────────────
+    #  EBV observe
     shiny::observe({
       shiny::req(candidates_data())
       ebv_res <- ebv_data()
@@ -830,7 +829,7 @@ mod_allomate_server <- function(id, parent_session) {
         value = 80, status = "info", title = "EBV matrix ready. Run OCS to complete analysis."
       )
       
-      # ── Candidate-EBV status UI ──────────────────────────────────────
+      #  Candidate-EBV status UI 
       total_candidates <- dplyr::n_distinct(cands$id)
       total_ebvs       <- length(ebv_ids)
       
@@ -901,7 +900,7 @@ mod_allomate_server <- function(id, parent_session) {
       }
     )
     
-    # ── OCS server logic ──────────────────────────────────────────────────
+    #  OCS server logic
     shiny::observeEvent(input$force_greedy_mating, {
       if (!ocs_checkboxes_enabled) return(NULL)
       options(allomate.force_greedy_mating = isTRUE(input$force_greedy_mating))

@@ -100,12 +100,11 @@ mod_ped_cleaner_ui <- function(id) {
 #' @noRd
 mod_ped_cleaner_server <- function(id, parent_session) {
   shiny::moduleServer(id, function(input, output, session) {
-    # Change 2: removed dead `ns <- session$ns`
-    
+
     check_results <- shiny::reactiveVal(NULL)
     error_message <- shiny::reactiveVal("")
     
-    # ── Help button ──────────────────────────────────────────────────────────
+    #  Help button 
     shiny::observeEvent(input$help_btn, {
       bs4Dash::updatebs4TabItems(
         session  = parent_session,
@@ -114,7 +113,7 @@ mod_ped_cleaner_server <- function(id, parent_session) {
       )
     })
     
-    # ── Dynamic startup guide ────────────────────────────────────────────────
+    #  Dynamic startup guide 
     output$dynamic_guide <- shiny::renderUI({
       current_error <- error_message()
       has_file      <- !is.null(input$ped_file)
@@ -156,7 +155,7 @@ mod_ped_cleaner_server <- function(id, parent_session) {
       shiny::HTML(paste(steps, collapse = ""))
     })
     
-    # ── Run check ────────────────────────────────────────────────────────────
+    #  Run check 
     shiny::observeEvent(input$run_check, {
       shiny::req(input$ped_file)
       error_message("")
@@ -199,8 +198,6 @@ mod_ped_cleaner_server <- function(id, parent_session) {
           verbose  = FALSE
         )
         
-        # Change 1: use $name (user's original filename) instead of $datapath
-        # (temp path) so the object name matches what check_ped() creates
         file_base      <- tools::file_path_sans_ext(basename(input$ped_file$name))
         corrected_name <- paste0(file_base, "_corrected")
         corrected_ped  <- tryCatch(
@@ -230,7 +227,7 @@ mod_ped_cleaner_server <- function(id, parent_session) {
       })
     })
     
-    # ── Summary banner ────────────────────────────────────────────────────────
+    #  Summary banner 
     output$summary_banner <- shiny::renderUI({
       shiny::req(check_results())
       report <- check_results()$report
@@ -265,7 +262,7 @@ mod_ped_cleaner_server <- function(id, parent_session) {
       ))
     })
     
-    # ── Results section titles ────────────────────────────────────────────────
+    #  Results section titles 
     output$results_ui <- shiny::renderUI({
       shiny::req(check_results())
       report <- check_results()$report
@@ -304,7 +301,7 @@ mod_ped_cleaner_server <- function(id, parent_session) {
       )
     })
     
-    # ── Download ──────────────────────────────────────────────────────────────
+    #  Download 
     output$download_results <- shiny::downloadHandler(
       filename = function() {
         paste0("pedigree_check_", Sys.Date(), ".zip")
