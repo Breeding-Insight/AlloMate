@@ -5,7 +5,6 @@
 #' @noRd
 mod_home_ui <- function(id) {
   ns <- shiny::NS(id)
-
   shiny::tagList(
     shiny::fluidRow(
       shiny::column(
@@ -21,9 +20,9 @@ mod_home_ui <- function(id) {
       shiny::column(
         width = 8,
         bs4Dash::box(
-          title = "Welcome to AlloMate",
-          width = 12,
-          status = "info",
+          title       = "Welcome to AlloMate",
+          width       = 12,
+          status      = "info",
           solidHeader = TRUE,
           collapsible = FALSE,
           shiny::tags$p(
@@ -39,31 +38,43 @@ mod_home_ui <- function(id) {
           )
         ),
         bs4Dash::box(
-          title = "Quick Start",
-          width = 12,
-          status = "warning",
+          title       = "Quick Start",
+          width       = 12,
+          status      = "warning",
           solidHeader = TRUE,
           collapsible = FALSE,
           shiny::tags$ol(
-            shiny::tags$li("Upload candidate list"),
-            shiny::tags$li("Upload pedigree file"),
-            shiny::tags$li("Set kinship threshold (optional)"),
-            shiny::tags$li("Add EBV trait files and weights"),
-            shiny::tags$li("Run OCS and export results")
-          )
-        )
+            shiny::tags$li(
+              shiny::tags$strong("Prepare Data"),
+              shiny::tags$ul(
+                shiny::tags$li("Upload your pedigree file to the Pedigree Cleaning tab"),
+                shiny::tags$li("Review detected issues and download the corrected pedigree")
+              )
+            ),
+            shiny::tags$li(
+              shiny::tags$strong("Mate Allocation"),
+              shiny::tags$ul(
+                shiny::tags$li("Upload your candidate list"),
+                shiny::tags$li("Upload the corrected pedigree file"),
+                shiny::tags$li("Set kinship threshold (optional)"),
+                shiny::tags$li("Add EBV trait files and weights"),
+                shiny::tags$li("Run OCS and export results")
+              )
+            )
+          )  # closes tags$ol
+        )   # closes Quick Start box
       ),
       shiny::column(
         width = 4,
         bs4Dash::box(
-          title = "Links & Citation",
-          width = 12,
-          status = "secondary",
+          title       = "Links & Citation",
+          width       = 12,
+          status      = "secondary",
           solidHeader = TRUE,
           collapsible = FALSE,
           shiny::tags$p(
             shiny::tags$a(
-              href = "https://github.com/Breeding-Insight/AlloMate",
+              href   = "https://github.com/Breeding-Insight/AlloMate",
               target = "_blank",
               "AlloMate on GitHub"
             )
@@ -97,4 +108,3 @@ mod_home_server <- function(id, parent_session) {
     })
   })
 }
-
