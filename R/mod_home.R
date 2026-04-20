@@ -71,7 +71,7 @@ mod_home_ui <- function(id) {
           shiny::tags$hr(),
           shiny::tags$p("If you use AlloMate in research, please cite:"),
           shiny::tags$p(
-            shiny::tags$strong("Chinchilla-Vargas, J., Ackerman, A. J., & Taniguti, C. H."),
+            shiny::tags$strong("Chinchilla-Vargas, J., Ackerman, A. J., Taniguti, C. H., & Sandercock, A. M."),
             shiny::tags$br(),
             "AlloMate: Genetic Mate Allocation and Breeding Optimization App.",
             shiny::tags$br(),
