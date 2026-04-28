@@ -29,7 +29,7 @@ mod_home_ui <- function(id) {
             "AlloMate helps breeding programs allocate mates and optimize selection decisions by combining pedigree-based kinship, weighted EBVs, and Optimum Contribution Selection (OCS)."
           ),
           shiny::tags$p(
-            "Use the AlloMate tab to upload your data, configure parameters, run OCS, and export results."
+            "Use the Mate Allocation tab to upload your data, configure parameters, run OCS, and export results."
           ),
           shiny::actionButton(
             ns("go_allomate"),

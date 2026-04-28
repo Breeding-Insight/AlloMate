@@ -39,13 +39,13 @@ app_ui <- function(request) {
           tags$li(
             class = "header",
             style = "color: grey; margin-top: 18px; margin-bottom: 10px; padding-left: 15px;",
-            "Prepare Data"
+            "Data Wrangling"
           ),
           bs4Dash::menuItem("Pedigree Cleaning", tabName = "ped_cleaner", icon = shiny::icon("diagram-project")),
           tags$li(
             class = "header",
             style = "color: grey; margin-top: 18px; margin-bottom: 10px; padding-left: 15px;",
-            "Analysis"
+            "Analysis",
           ),
           bs4Dash::menuItem("Mate Allocation", tabName = "allomate", icon = shiny::icon("bullseye")),
           tags$li(
