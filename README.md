@@ -130,7 +130,7 @@ Optional:
 
 If you use AlloMate in research or breeding analyses, please cite it as:
 
-Chinchilla-Vargas, J., Ackerman, A. J., & Taniguti, C. H.
+Chinchilla-Vargas, J., Ackerman, A. J., & Taniguti, C. H., Sandercock, A. M.  
 AlloMate: Genetic Mate Allocation and Breeding Optimization App.
   - RRID: SCR_027115
 
