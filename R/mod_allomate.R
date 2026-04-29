@@ -603,8 +603,6 @@ mod_allomate_server <- function(id, parent_session) {
       )
       tryCatch({
         raw_ped <- readr::read_table(input$pedigree_file$datapath)
-        # Rename male_parent -> sire and female_parent -> dam for internal processing
-        raw_ped <- dplyr::rename(raw_ped, sire = male_parent, dam = female_parent)
         cleaned_ped <- clean_pedigree(raw_ped, return_stats = TRUE)
         final_ped   <- cleaned_ped$pedigree
         candidate_ids         <- candidates_data()$candidates$id
@@ -863,8 +861,6 @@ mod_allomate_server <- function(id, parent_session) {
       tryCatch({
         ped_data   <- read.table(input$pedigree_file$datapath, header = TRUE, stringsAsFactors = FALSE)
         candidates <- read.table(input$candidate_file$datapath, header = TRUE, stringsAsFactors = FALSE)
-        # Rename male_parent -> sire and female_parent -> dam for internal processing
-        ped_data <- dplyr::rename(ped_data, sire = male_parent, dam = female_parent)
         final_ped  <- clean_pedigree(ped_data)
         shinyWidgets::updateProgressBar(
           session = session, id = "pb_allomate",

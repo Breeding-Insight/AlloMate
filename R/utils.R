@@ -65,21 +65,21 @@ read_candidates <- function(file) {
 clean_pedigree <- function(ped, return_stats = FALSE) {
   kinship2_available <- requireNamespace("kinship2", quietly = TRUE)
 
-  ped_chr <- ped %>% mutate(across(c(id, sire, dam), as.character))
+  ped_chr <- ped %>% mutate(across(c(id, male_parent, female_parent), as.character))
   is_missing_parent <- function(x) { is.na(x) | x == "" | x == "0" }
   total_records <- nrow(ped_chr)
-  unknown_parent_count <- sum(is_missing_parent(ped_chr$sire) | is_missing_parent(ped_chr$dam), na.rm = TRUE)
-  circular_rows <- (ped_chr$id == ped_chr$sire) | (ped_chr$id == ped_chr$dam)
+  unknown_parent_count <- sum(is_missing_parent(ped_chr$male_parent) | is_missing_parent(ped_chr$female_parent), na.rm = TRUE)
+  circular_rows <- (ped_chr$id == ped_chr$male_parent) | (ped_chr$id == ped_chr$female_parent)
   circular_reference_count <- sum(circular_rows, na.rm = TRUE)
   duplicates_removed <- sum(duplicated(ped_chr$id))
-  final_ped <- ped_chr %>% mutate(across(c(id, sire, dam), as.factor)) %>% mutate(sex = case_when(id %in% sire ~ 0, id %in% dam ~ 1, TRUE ~ 2)) %>% {
-    messy_parents <- setdiff(intersect(.$sire, .$dam), 0) %>% as.data.frame() %>% rename(id = 1)
+  final_ped <- ped_chr %>% mutate(across(c(id, male_parent, female_parent), as.factor)) %>% mutate(sex = case_when(id %in% male_parent ~ 0, id %in% female_parent ~ 1, TRUE ~ 2)) %>% {
+    messy_parents <- setdiff(intersect(.$male_parent, .$female_parent), 0) %>% as.data.frame() %>% rename(id = 1)
     parents_fixed <- .
-    parents_fixed$sire[parents_fixed$sire %in% messy_parents$id] <- 0
-    parents_fixed$dam[parents_fixed$dam %in% messy_parents$id] <- 0
+    parents_fixed$male_parent[parents_fixed$male_parent %in% messy_parents$id] <- 0
+    parents_fixed$female_parent[parents_fixed$female_parent %in% messy_parents$id] <- 0
     parents_fixed
-  } %>% { .[!duplicated(.$id), ] } %>% { circdep <- .; circdep$id <- as.character(circdep$id); circdep$sire <- as.character(circdep$sire); circdep$dam <- as.character(circdep$dam); circdep <- circdep[circdep$id == circdep$sire | circdep$id == circdep$dam, ]; .[!.$id %in% circdep$id, ] } %>%
-    with(., if (exists("kinship2_available") && kinship2_available) kinship2::fixParents(id, sire, dam, sex, missid = "0") else fallback_fixParents(id, sire, dam, sex, missid = "0")) %>%
+  } %>% { .[!duplicated(.$id), ] } %>% { circdep <- .; circdep$id <- as.character(circdep$id); circdep$male_parent <- as.character(circdep$male_parent); circdep$female_parent <- as.character(circdep$female_parent); circdep <- circdep[circdep$id == circdep$male_parent | circdep$id == circdep$female_parent, ]; .[!.$id %in% circdep$id, ] } %>%
+    with(., if (exists("kinship2_available") && kinship2_available) kinship2::fixParents(id, male_parent, female_parent, sex, missid = "0") else fallback_fixParents(id, male_parent, female_parent, sex, missid = "0")) %>%
     with(., if (exists("kinship2_available") && kinship2_available) kinship2::pedigree(id, dadid, momid, sex, missid = "0") else fallback_pedigree(id, dadid, momid, sex, missid = "0"))
   if (return_stats) {
     stats <- list(records_loaded = total_records, unknown_parent_count = unknown_parent_count, circular_reference_count = circular_reference_count, duplicates_removed = duplicates_removed)
