@@ -434,7 +434,7 @@ mod_ped_cleaner_server <- function(id, parent_session) {
           exact_duplicates       = report$exact_duplicates,
           conflicting_ids        = report$repeated_ids_diff,
           inconsistent_sex_roles = report$inconsistent_sex_roles,
-          missing_parents        = report$missing_parents
+          missing_parents        = report$missing_parents,
           dependencies           = report$dependencies
         )
         
