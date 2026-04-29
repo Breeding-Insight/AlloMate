@@ -136,31 +136,6 @@ mod_ped_cleaner_server <- function(id, parent_session) {
       )
     }
     
-    ped_table <- function(rows) {
-      shiny::tags$table(
-        class = "table table-bordered table-sm",
-        style = "width: auto; font-size: 12px; margin-bottom: 6px;",
-        shiny::tags$thead(
-          shiny::tags$tr(
-            shiny::tags$th("id"),
-            shiny::tags$th("male_parent"),
-            shiny::tags$th("female_parent")
-          )
-        ),
-        shiny::tags$tbody(rows)
-      )
-    }
-    
-    ped_row <- function(id, sire, dam, bg = NULL) {
-      style <- if (!is.null(bg)) paste0("background-color:", bg, ";") else ""
-      shiny::tags$tr(
-        style = style,
-        shiny::tags$td(id),
-        shiny::tags$td(sire),
-        shiny::tags$td(dam)
-      )
-    }
-    
     sanitize_id <- function(x) gsub("[^A-Za-z0-9]", "_", tolower(x))
     
     # Startup 
