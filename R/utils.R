@@ -65,6 +65,19 @@ read_candidates <- function(file) {
 clean_pedigree <- function(ped, return_stats = FALSE) {
   kinship2_available <- requireNamespace("kinship2", quietly = TRUE)
 
+  names(ped) <- tolower(names(ped))
+  if (!"male_parent" %in% names(ped) && "sire" %in% names(ped)) {
+    names(ped)[names(ped) == "sire"] <- "male_parent"
+  }
+  if (!"female_parent" %in% names(ped) && "dam" %in% names(ped)) {
+    names(ped)[names(ped) == "dam"] <- "female_parent"
+  }
+
+  required <- c("id", "male_parent", "female_parent")
+  missing_cols <- setdiff(required, names(ped))
+  if (length(missing_cols) > 0) {
+    stop(sprintf("PEDIGREE: missing required column(s): %s", paste(missing_cols, collapse = ", ")))
+  }
   ped_chr <- ped %>% mutate(across(c(id, male_parent, female_parent), as.character))
   is_missing_parent <- function(x) { is.na(x) | x == "" | x == "0" }
   total_records <- nrow(ped_chr)
