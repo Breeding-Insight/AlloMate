@@ -64,6 +64,7 @@ read_candidates <- function(file) {
 #' @return cleaned pedigree
 clean_pedigree <- function(ped, return_stats = FALSE) {
   kinship2_available <- requireNamespace("kinship2", quietly = TRUE)
+<<<<<<< HEAD
 
   names(ped) <- tolower(names(ped))
   if (!"male_parent" %in% names(ped) && "sire" %in% names(ped)) {
@@ -78,26 +79,83 @@ clean_pedigree <- function(ped, return_stats = FALSE) {
   if (length(missing_cols) > 0) {
     stop(sprintf("PEDIGREE: missing required column(s): %s", paste(missing_cols, collapse = ", ")))
   }
+=======
+  
+  # Fail fast with a clear message if required columns are missing
+  required <- c("id", "male_parent", "female_parent")
+  missing_cols <- setdiff(required, tolower(names(ped)))
+  if (length(missing_cols) > 0) {
+    stop(sprintf(
+      "PEDIGREE: missing required column(s): %s. Expected columns: id, male_parent, female_parent.",
+      paste(missing_cols, collapse = ", ")
+    ))
+  }
+  
+  names(ped) <- tolower(names(ped))
+  
+  # Keep as character throughout cleaning — only factorize when needed
+>>>>>>> 547ffac (fixed for male_parent)
   ped_chr <- ped %>% mutate(across(c(id, male_parent, female_parent), as.character))
-  is_missing_parent <- function(x) { is.na(x) | x == "" | x == "0" }
-  total_records <- nrow(ped_chr)
-  unknown_parent_count <- sum(is_missing_parent(ped_chr$male_parent) | is_missing_parent(ped_chr$female_parent), na.rm = TRUE)
-  circular_rows <- (ped_chr$id == ped_chr$male_parent) | (ped_chr$id == ped_chr$female_parent)
+  
+  is_missing_parent    <- function(x) { is.na(x) | x == "" | x == "0" }
+  total_records        <- nrow(ped_chr)
+  unknown_parent_count <- sum(
+    is_missing_parent(ped_chr$male_parent) | is_missing_parent(ped_chr$female_parent),
+    na.rm = TRUE
+  )
+  circular_rows            <- (ped_chr$id == ped_chr$male_parent) | (ped_chr$id == ped_chr$female_parent)
   circular_reference_count <- sum(circular_rows, na.rm = TRUE)
-  duplicates_removed <- sum(duplicated(ped_chr$id))
-  final_ped <- ped_chr %>% mutate(across(c(id, male_parent, female_parent), as.factor)) %>% mutate(sex = case_when(id %in% male_parent ~ 0, id %in% female_parent ~ 1, TRUE ~ 2)) %>% {
-    messy_parents <- setdiff(intersect(.$male_parent, .$female_parent), 0) %>% as.data.frame() %>% rename(id = 1)
-    parents_fixed <- .
-    parents_fixed$male_parent[parents_fixed$male_parent %in% messy_parents$id] <- 0
-    parents_fixed$female_parent[parents_fixed$female_parent %in% messy_parents$id] <- 0
-    parents_fixed
-  } %>% { .[!duplicated(.$id), ] } %>% { circdep <- .; circdep$id <- as.character(circdep$id); circdep$male_parent <- as.character(circdep$male_parent); circdep$female_parent <- as.character(circdep$female_parent); circdep <- circdep[circdep$id == circdep$male_parent | circdep$id == circdep$female_parent, ]; .[!.$id %in% circdep$id, ] } %>%
-    with(., if (exists("kinship2_available") && kinship2_available) kinship2::fixParents(id, male_parent, female_parent, sex, missid = "0") else fallback_fixParents(id, male_parent, female_parent, sex, missid = "0")) %>%
-    with(., if (exists("kinship2_available") && kinship2_available) kinship2::pedigree(id, dadid, momid, sex, missid = "0") else fallback_pedigree(id, dadid, momid, sex, missid = "0"))
+  duplicates_removed       <- sum(duplicated(ped_chr$id))
+  
+  # Fix messy parents while still in character form to avoid factor NA assignment
+  messy_parents <- setdiff(
+    intersect(ped_chr$male_parent, ped_chr$female_parent),
+    c("0", NA, "")
+  )
+  ped_chr$male_parent[ped_chr$male_parent %in% messy_parents]     <- "0"
+  ped_chr$female_parent[ped_chr$female_parent %in% messy_parents] <- "0"
+  
+  # Remove duplicates
+  ped_chr <- ped_chr[!duplicated(ped_chr$id), ]
+  
+  # Remove circular dependencies
+  circdep <- ped_chr[
+    ped_chr$id == ped_chr$male_parent | ped_chr$id == ped_chr$female_parent, 
+  ]
+  ped_chr <- ped_chr[!ped_chr$id %in% circdep$id, ]
+  
+  # Now factorize and assign sex
+  ped_fct <- ped_chr %>%
+    mutate(across(c(id, male_parent, female_parent), as.factor)) %>%
+    mutate(sex = case_when(
+      id %in% male_parent   ~ 0,
+      id %in% female_parent ~ 1,
+      TRUE                  ~ 2
+    ))
+  
+  final_ped <- with(ped_fct,
+                    if (kinship2_available)
+                      kinship2::fixParents(id, male_parent, female_parent, sex, missid = "0")
+                    else
+                      fallback_fixParents(id, male_parent, female_parent, sex, missid = "0")
+  ) %>%
+    with(.,
+         if (kinship2_available)
+           kinship2::pedigree(id, dadid, momid, sex, missid = "0")
+         else
+           fallback_pedigree(id, dadid, momid, sex, missid = "0")
+    )
+  
   if (return_stats) {
-    stats <- list(records_loaded = total_records, unknown_parent_count = unknown_parent_count, circular_reference_count = circular_reference_count, duplicates_removed = duplicates_removed)
+    stats <- list(
+      records_loaded           = total_records,
+      unknown_parent_count     = unknown_parent_count,
+      circular_reference_count = circular_reference_count,
+      duplicates_removed       = duplicates_removed
+    )
     return(list(pedigree = final_ped, stats = stats))
   }
+  
   return(final_ped)
 }
 
