@@ -12,7 +12,7 @@ mod_home_ui <- function(id) {
         shiny::div(
           style = "display:flex; align-items:center; justify-content:space-between; margin: 10px 0 20px 0;",
           shiny::tags$img(src = "www/allomate.png", height = "120", style = "margin-left: 10px;"),
-          shiny::tags$img(src = "www/logos2.png", style = "width: 70%; height: auto; margin-right: 10px;")
+          shiny::tags$img(src = "www/logos.png", style = "width: 70%; height: auto; margin-right: 10px;")
         )
       )
     ),

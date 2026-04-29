@@ -104,7 +104,7 @@ Optional:
 
 1. Upload required input files:
    - Candidate list (IDs and sex)
-   - Pedigree file (individual, sire, dam)
+   - Pedigree file (id, male_parent, female_parent
    - EBV files for one or more traits
 
 2. Run pedigree cleaning:
