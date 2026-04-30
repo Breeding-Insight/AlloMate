@@ -242,7 +242,7 @@ mod_allomate_server <- function(id, parent_session) {
           size      = "l",
           easyClose = TRUE,
           footer    = shiny::modalButton("Close"),
-          help_content_allomate(collapse_fn = make_collapse_panel, id_prefix = "modal")
+          help_content_allomate(id_prefix = "modal")
         )
       )
     })
@@ -584,7 +584,6 @@ mod_allomate_server <- function(id, parent_session) {
       )
       tryCatch({
         raw_ped <- readr::read_table(input$pedigree_file$datapath)
-        
         required_cols <- c("id", "male_parent", "female_parent")
         missing_cols  <- setdiff(required_cols, colnames(raw_ped))
         if (length(missing_cols) > 0) {
@@ -594,7 +593,6 @@ mod_allomate_server <- function(id, parent_session) {
             ". File must contain: id, male_parent, female_parent."
           ))
         }
-        
         cleaned_ped <- clean_pedigree(raw_ped, return_stats = TRUE)
         final_ped   <- cleaned_ped$pedigree
         candidate_ids         <- candidates_data()$candidates$id
@@ -861,7 +859,6 @@ mod_allomate_server <- function(id, parent_session) {
       tryCatch({
         ped_data   <- read.table(input$pedigree_file$datapath, header = TRUE, stringsAsFactors = FALSE)
         candidates <- read.table(input$candidate_file$datapath, header = TRUE, stringsAsFactors = FALSE)
-        
         required_cols <- c("id", "male_parent", "female_parent")
         missing_cols  <- setdiff(required_cols, colnames(ped_data))
         if (length(missing_cols) > 0) {
@@ -871,7 +868,6 @@ mod_allomate_server <- function(id, parent_session) {
             ". File must contain: id, male_parent, female_parent."
           ))
         }
-        
         final_ped  <- clean_pedigree(ped_data)
         shinyWidgets::updateProgressBar(
           session = session, id = "pb_allomate",
