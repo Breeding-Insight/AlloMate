@@ -3,13 +3,13 @@
 
 #' Fallback fixParents
 #' @param id vector of IDs
-#' @param sire vector of sires
-#' @param dam vector of dams
+#' @param male_parent vector of male parents
+#' @param female_parent vector of female parents
 #' @param sex vector of sex values
 #' @param missid missing id value
 #' @return data.frame
-fallback_fixParents <- function(id, sire, dam, sex, missid = "0") {
-  data.frame(id = id, dadid = sire, momid = dam, sex = sex, stringsAsFactors = FALSE)
+fallback_fixParents <- function(id, male_parent, female_parent, sex, missid = "0") {
+  data.frame(id = id, dadid = male_parent, momid = female_parent, sex = sex, stringsAsFactors = FALSE)
 }
 
 #' Fallback pedigree
@@ -47,11 +47,11 @@ read_candidates <- function(file) {
   if (length(missing_cols) > 0) {
     stop(sprintf("CANDIDATES: missing required column(s): %s", paste(missing_cols, collapse = ", ")))
   }
-  df$id <- as.character(df$id)
+  df$id  <- as.character(df$id)
   df$sex <- toupper(as.character(df$sex))
   list(
     candidates = df,
-    males = filter(df, sex == "M") %>% pull(id),
+    males   = filter(df, sex == "M") %>% pull(id),
     females = filter(df, sex == "F") %>% pull(id)
   )
 }
@@ -64,25 +64,9 @@ read_candidates <- function(file) {
 #' @return cleaned pedigree
 clean_pedigree <- function(ped, return_stats = FALSE) {
   kinship2_available <- requireNamespace("kinship2", quietly = TRUE)
-<<<<<<< HEAD
-
-  names(ped) <- tolower(names(ped))
-  if (!"male_parent" %in% names(ped) && "sire" %in% names(ped)) {
-    names(ped)[names(ped) == "sire"] <- "male_parent"
-  }
-  if (!"female_parent" %in% names(ped) && "dam" %in% names(ped)) {
-    names(ped)[names(ped) == "dam"] <- "female_parent"
-  }
-
-  required <- c("id", "male_parent", "female_parent")
-  missing_cols <- setdiff(required, names(ped))
-  if (length(missing_cols) > 0) {
-    stop(sprintf("PEDIGREE: missing required column(s): %s", paste(missing_cols, collapse = ", ")))
-  }
-=======
   
   # Fail fast with a clear message if required columns are missing
-  required <- c("id", "male_parent", "female_parent")
+  required     <- c("id", "male_parent", "female_parent")
   missing_cols <- setdiff(required, tolower(names(ped)))
   if (length(missing_cols) > 0) {
     stop(sprintf(
@@ -94,7 +78,6 @@ clean_pedigree <- function(ped, return_stats = FALSE) {
   names(ped) <- tolower(names(ped))
   
   # Keep as character throughout cleaning — only factorize when needed
->>>>>>> 547ffac (fixed for male_parent)
   ped_chr <- ped %>% mutate(across(c(id, male_parent, female_parent), as.character))
   
   is_missing_parent    <- function(x) { is.na(x) | x == "" | x == "0" }
@@ -120,7 +103,7 @@ clean_pedigree <- function(ped, return_stats = FALSE) {
   
   # Remove circular dependencies
   circdep <- ped_chr[
-    ped_chr$id == ped_chr$male_parent | ped_chr$id == ped_chr$female_parent, 
+    ped_chr$id == ped_chr$male_parent | ped_chr$id == ped_chr$female_parent,
   ]
   ped_chr <- ped_chr[!ped_chr$id %in% circdep$id, ]
   
@@ -168,11 +151,17 @@ clean_pedigree <- function(ped, return_stats = FALSE) {
 #' @return list
 compute_kinship_matrix <- function(ped, males, females) {
   kinship2_available <- requireNamespace("kinship2", quietly = TRUE)
-
   kinship_matrix <- if (exists("kinship2_available") && kinship2_available) kinship2::kinship(ped) else fallback_kinship(ped)
-  kin_mat_sel <- kinship_matrix[males, females]
-  kin_quads <- tibble(Data = "Kinship", Q25 = quantile(kin_mat_sel, 0.25), Q50 = quantile(kin_mat_sel, 0.50), Q75 = quantile(kin_mat_sel, 0.75), Q100 = quantile(kin_mat_sel, 1.00)) %>% column_to_rownames("Data")
-  kinship_results <- as_tibble(kin_mat_sel, rownames = "Male") %>% pivot_longer(-Male, names_to = "Female", values_to = "Kinship")
+  kin_mat_sel    <- kinship_matrix[males, females]
+  kin_quads      <- tibble(
+    Data = "Kinship",
+    Q25  = quantile(kin_mat_sel, 0.25),
+    Q50  = quantile(kin_mat_sel, 0.50),
+    Q75  = quantile(kin_mat_sel, 0.75),
+    Q100 = quantile(kin_mat_sel, 1.00)
+  ) %>% column_to_rownames("Data")
+  kinship_results <- as_tibble(kin_mat_sel, rownames = "Male") %>%
+    pivot_longer(-Male, names_to = "Female", values_to = "Kinship")
   list(results = kinship_results, quads = kin_quads, matrix = kin_mat_sel)
 }
 
@@ -188,22 +177,23 @@ compute_kinship_matrix <- function(ped, males, females) {
 process_ebvs <- function(trait_counter, input, prefix = "") {
   ebv_inputs <- list()
   for (i in seq_len(trait_counter)) {
-    file_i <- input[[paste0(prefix, "trait_file_", i)]]
+    file_i   <- input[[paste0(prefix, "trait_file_",   i)]]
     weight_i <- input[[paste0(prefix, "trait_weight_", i)]]
     if (!is.null(file_i) && !is.null(weight_i)) {
       df_raw <- read_table(file_i$datapath)
-      if (!"ID" %in% names(df_raw)) names(df_raw)[1] <- "ID"
-      if (!"EBV" %in% names(df_raw)) names[df_raw][2] <- "EBV"
+      if (!"ID"  %in% names(df_raw)) names(df_raw)[1] <- "ID"
+      if (!"EBV" %in% names(df_raw)) names(df_raw)[2] <- "EBV"
       df_raw$EBV <- as.numeric(df_raw$EBV)
       ebv_inputs <- append(ebv_inputs, list(select(df_raw, ID, EBV), weight_i))
     }
   }
   if (length(ebv_inputs) >= 2 && length(ebv_inputs) %% 2 == 0) {
-    rel_weights <- unlist(ebv_inputs[seq(2, length(ebv_inputs), by = 2)])
+    rel_weights  <- unlist(ebv_inputs[seq(2, length(ebv_inputs), by = 2)])
     weight_total <- sum(rel_weights)
-    ebv_dfs <- ebv_inputs[seq(1, length(ebv_inputs), by = 2)]
-    ebv_dfs <- imap(ebv_dfs, ~ rename(.x, !!paste0("EBV.", .y) := EBV))
-    joint_ebvs <- reduce(ebv_dfs, full_join, by = "ID") %>% mutate(across(starts_with("EBV."), ~ replace_na(.x, 0)))
+    ebv_dfs      <- ebv_inputs[seq(1, length(ebv_inputs), by = 2)]
+    ebv_dfs      <- imap(ebv_dfs, ~ rename(.x, !!paste0("EBV.", .y) := EBV))
+    joint_ebvs   <- reduce(ebv_dfs, full_join, by = "ID") %>%
+      mutate(across(starts_with("EBV."), ~ replace_na(.x, 0)))
     list(joint_ebvs = joint_ebvs, rel_weights = rel_weights, weight_total = weight_total)
   } else NULL
 }
@@ -227,5 +217,9 @@ format_id_list <- function(ids, limit = 4) {
   ids <- unique(ids)
   ids <- ids[!is.na(ids) & ids != ""]
   if (length(ids) == 0) return("")
-  if (length(ids) <= limit) paste(ids, collapse = ", ") else paste(c(ids[seq_len(limit)], "(5 or more)"), collapse = ", ")
+  if (length(ids) <= limit) {
+    paste(ids, collapse = ", ")
+  } else {
+    paste(c(ids[seq_len(limit)], "(5 or more)"), collapse = ", ")
+  }
 }
