@@ -69,17 +69,17 @@ AlloMate uses a golem application structure, allowing it to be installed like
 a standard R package.
 
 ### Install from GitHub
-
+```{r}
 if (!requireNamespace("remotes", quietly = TRUE)) {
   install.packages("remotes")
 }
 
 remotes::install_github("Breeding-Insight/AlloMate")
-
+```
 ### Run AlloMate
-
+```{r}
 AlloMate::run_app()
-
+```
 ---
 
 ## Dependencies
