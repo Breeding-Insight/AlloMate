@@ -328,9 +328,9 @@ format_ocs_results <- function(results) {
       # Keep Kinship as numeric
       Kinship = as.numeric(Kinship)
     ) %>%
-    rename(`# Matings` = n) %>%
+    rename(`# Offspring` = n) %>%
     mutate(`Expected EBV` = round(expected_bv, 3)) %>%
-    select(Male, Female, Kinship, `# Matings`, `Expected EBV`)
+    select(Male, Female, Kinship, `# Offspring`, `Expected EBV`)
   
   # Calculate summary statistics - handle different kinship column names
   kinship_values <- NA
@@ -443,15 +443,15 @@ create_ocs_workbook <- function(results, params = NULL, kinship_threshold = NULL
   if (all(c("Sire", "Dam") %in% names(mating_export))) {
     mating_df <- mating_export %>%
       select(Sire, Dam, Kinship, n) %>%
-      rename(`# Matings` = n)
+      rename(`# Offspring` = n)
   } else if (all(c("Male", "Female") %in% names(mating_export))) {
     mating_df <- mating_export %>%
       select(Male, Female, Kinship, n) %>%
-      rename(`# Matings` = n)
+      rename(`# Offspring` = n)
   } else {
     # Fallback if column names are different
     mating_df <- mating_export %>%
-      rename(`# Matings` = n)
+      rename(`# Offspring` = n)
   }
   writeData(wb, "Mating Plan", mating_df)
   

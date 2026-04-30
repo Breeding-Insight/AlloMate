@@ -39,7 +39,7 @@ app_ui <- function(request) {
           tags$li(
             class = "header",
             style = "color: grey; margin-top: 18px; margin-bottom: 10px; padding-left: 15px;",
-            "Prepare Data"
+            "Data Wrangling"
           ),
           bs4Dash::menuItem("Pedigree Cleaning", tabName = "ped_cleaner", icon = shiny::icon("diagram-project")),
           tags$li(
@@ -57,6 +57,10 @@ app_ui <- function(request) {
         )
       ),
       footer = bs4Dash::dashboardFooter(
+        left = div(
+          style = "display: flex; align-items: center; height: 100%;",
+          sprintf("v%s", as.character(utils::packageVersion("AlloMate")))
+        ),
         right = div(
           style = "display: flex; align-items: center;",
           div(
@@ -65,18 +69,11 @@ app_ui <- function(request) {
             div("Funded by USDA through UF|IFAS")
           ),
           div(
+            style = "margin-right: 15px;",
             a(
-              img(src = "www/usda-logo-color.png", height = "45px"),
-              style = "margin-right: 15px;"
-            ),
-            a(
-              img(src = "www/cornell_seal_simple_web_b31b1b.png", height = "45px")
+              img(src = "www/logos.png", height = "45px")
             )
           )
-        ),
-        left = div(
-          style = "display: flex; align-items: center; height: 100%;",
-          sprintf("v%s", as.character(utils::packageVersion("AlloMate")))
         )
       ),
       bs4Dash::dashboardBody(

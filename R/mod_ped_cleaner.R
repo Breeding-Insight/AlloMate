@@ -5,8 +5,8 @@
 #' @noRd
 mod_ped_cleaner_ui <- function(id) {
   ns <- shiny::NS(id)
-  
   shiny::tagList(
+    shinyjs::useShinyjs(),
     shiny::sidebarLayout(
       shiny::sidebarPanel(
         shiny::div(
@@ -32,13 +32,13 @@ mod_ped_cleaner_ui <- function(id) {
             style = "color: #000000; margin-bottom: 15px; border-bottom: 1px solid #000000; padding-bottom: 8px;"
           ),
           shiny::p(
-            "Upload a tab-separated pedigree file with columns: id, sire, dam.",
+            "Upload a pedigree file (.txt, .tsv, or .csv) with columns: id, male_parent, female_parent.",
             style = "color: #6c757d; font-size: 12px; margin-bottom: 15px;"
           ),
           shiny::fileInput(
             ns("ped_file"),
             "Upload pedigree file",
-            accept = c(".txt", ".csv")
+            accept = c(".txt", ".tsv", ".csv")
           ),
           shiny::actionButton(
             ns("run_check"),
@@ -56,10 +56,12 @@ mod_ped_cleaner_ui <- function(id) {
             "Download the corrected pedigree and issue report as a zip file:",
             style = "color: #6c757d; font-size: 12px; margin-bottom: 15px;"
           ),
-          shiny::downloadButton(
-            ns("download_results"),
-            "Export Corrected Pedigree + Report",
-            style = "width: 100%; background-color: #28a745; color: white; border: none; padding: 10px; border-radius: 5px;"
+          shinyjs::disabled(
+            shiny::downloadButton(
+              ns("download_results"),
+              "Export Corrected Pedigree + Report",
+              style = "width: 100%; background-color: #28a745; color: white; border: none; padding: 10px; border-radius: 5px;"
+            )
           )
         )
       ),
@@ -100,20 +102,42 @@ mod_ped_cleaner_ui <- function(id) {
 #' @noRd
 mod_ped_cleaner_server <- function(id, parent_session) {
   shiny::moduleServer(id, function(input, output, session) {
-
     check_results <- shiny::reactiveVal(NULL)
     error_message <- shiny::reactiveVal("")
     
-    #  Help button 
-    shiny::observeEvent(input$help_btn, {
-      bs4Dash::updatebs4TabItems(
-        session  = parent_session,
-        inputId  = "MainMenu",
-        selected = "help"
+    # Helpers
+    make_collapse_panel <- function(panel_id, icon_name, label, body_content) {
+      shiny::tags$div(
+        class = "card mb-1",
+        style = "border: 1px solid #dee2e6; border-radius: 4px;",
+        shiny::tags$div(
+          class = "card-header p-0",
+          style = "background-color: #f8f9fa;",
+          shiny::tags$button(
+            class           = "btn btn-link btn-sm w-100 text-left d-flex align-items-center",
+            style           = "color: #343a40; text-decoration: none; font-size: 13px; padding: 8px 12px; gap: 6px;",
+            `data-toggle`   = "collapse",
+            `data-target`   = paste0("#", panel_id),
+            `aria-expanded` = "false",
+            shiny::icon(icon_name),
+            shiny::tags$span(label)
+          )
+        ),
+        shiny::tags$div(
+          id    = panel_id,
+          class = "collapse",
+          shiny::tags$div(
+            class = "card-body",
+            style = "padding: 12px 14px; font-size: 13px;",
+            body_content
+          )
+        )
       )
-    })
+    }
     
-    #  Dynamic startup guide 
+    sanitize_id <- function(x) gsub("[^A-Za-z0-9]", "_", tolower(x))
+    
+    # Startup
     output$dynamic_guide <- shiny::renderUI({
       current_error <- error_message()
       has_file      <- !is.null(input$ped_file)
@@ -137,7 +161,7 @@ mod_ped_cleaner_server <- function(id, parent_session) {
       }
       
       steps <- c(
-        sprintf("<p>%s <strong>Step 1:</strong> Upload your pedigree file (.txt or .csv)</p>",
+        sprintf("<p>%s <strong>Step 1:</strong> Upload your pedigree file (.txt, .tsv, or .csv)</p>",
                 get_icon(has_file)),
         sprintf("<p>%s <strong>Step 2:</strong> Click 'Run Pedigree Check' to detect and fix issues</p>",
                 get_icon(has_results)),
@@ -151,42 +175,72 @@ mod_ped_cleaner_server <- function(id, parent_session) {
                    "<p style='color: #28a745; font-weight: bold;'>Your corrected pedigree is ready to download.</p>"
         )
       }
-      
       shiny::HTML(paste(steps, collapse = ""))
     })
     
-    #  Run check 
+    # Help button
+    shiny::observeEvent(input$help_btn, {
+      shiny::showModal(
+        shiny::modalDialog(
+          title     = shiny::tagList(shiny::icon("circle-question"), " Pedigree Cleaner — Help"),
+          size      = "l",
+          easyClose = TRUE,
+          footer    = shiny::modalButton("Close"),
+          help_content_ped_cleaner(collapse_fn = make_collapse_panel, id_prefix = "modal")
+        )
+      )
+    })
+    
+    # Run check
     shiny::observeEvent(input$run_check, {
       shiny::req(input$ped_file)
       error_message("")
       check_results(NULL)
+      shinyjs::disable(session$ns("download_results"))
       
       tryCatch({
-        
         shinyWidgets::updateProgressBar(
           session = session, id = "pb_ped",
           value = 10, status = "info",
           title = "Reading pedigree file..."
         )
         
+        tmp_path <- input$ped_file$datapath
+        file_ext <- tolower(tools::file_ext(input$ped_file$name))
+        
+        ped_raw <- if (file_ext == "csv") {
+          utils::read.csv(tmp_path, header = TRUE,
+                          stringsAsFactors = FALSE, check.names = FALSE)
+        } else {
+          utils::read.table(tmp_path, header = TRUE, sep = "\t",
+                            stringsAsFactors = FALSE, check.names = FALSE)
+        }
+        
+        required_cols <- c("id", "male_parent", "female_parent")
+        missing_cols  <- setdiff(required_cols, colnames(ped_raw))
+        if (length(missing_cols) > 0) {
+          stop(paste0(
+            "Missing required column(s): ",
+            paste(missing_cols, collapse = ", "),
+            ". File must contain: id, male_parent, female_parent."
+          ))
+        }
+        
         shinyWidgets::updateProgressBar(
           session = session, id = "pb_ped",
           value = 30, status = "info",
           title = "Checking for duplicate records..."
         )
-        
         shinyWidgets::updateProgressBar(
           session = session, id = "pb_ped",
           value = 50, status = "info",
-          title = "Checking for conflicting IDs and messy parents..."
+          title = "Checking for conflicting IDs and inconsistent parent sex roles..."
         )
-        
         shinyWidgets::updateProgressBar(
           session = session, id = "pb_ped",
           value = 70, status = "info",
           title = "Checking for missing parents..."
         )
-        
         shinyWidgets::updateProgressBar(
           session = session, id = "pb_ped",
           value = 85, status = "info",
@@ -194,13 +248,14 @@ mod_ped_cleaner_server <- function(id, parent_session) {
         )
         
         report <- BIGr::check_ped(
-          ped.file = input$ped_file$datapath,
-          verbose  = FALSE
+          ped.file = tmp_path,
+          verbose  = FALSE,
+          save_zip = FALSE
         )
         
-        file_base      <- tools::file_path_sans_ext(basename(input$ped_file$name))
-        corrected_name <- paste0(file_base, "_corrected")
-        corrected_ped  <- tryCatch(
+        file_base_actual <- tools::file_path_sans_ext(basename(tmp_path))
+        corrected_name   <- paste0(file_base_actual, "_corrected")
+        corrected_ped    <- tryCatch(
           get(corrected_name, envir = .GlobalEnv, inherits = FALSE),
           error = function(e) NULL
         )
@@ -215,6 +270,7 @@ mod_ped_cleaner_server <- function(id, parent_session) {
           value = 100, status = "success",
           title = "Finished"
         )
+        shinyjs::enable(session$ns("download_results"))
         
       }, error = function(e) {
         error_message(paste0("Error running pedigree check: ", e$message))
@@ -227,16 +283,15 @@ mod_ped_cleaner_server <- function(id, parent_session) {
       })
     })
     
-    #  Summary banner 
+    # Summary banner
     output$summary_banner <- shiny::renderUI({
       shiny::req(check_results())
       report <- check_results()$report
       
       get_count <- function(df) if (is.null(df) || !is.data.frame(df)) 0L else nrow(df)
-      
       n_dupes    <- get_count(report$exact_duplicates)
       n_conflict <- get_count(report$repeated_ids_diff)
-      n_messy    <- get_count(report$messy_parents)
+      n_messy    <- get_count(report$inconsistent_sex_roles)
       n_missing  <- get_count(report$missing_parents)
       n_cycles   <- get_count(report$dependencies)
       total      <- n_dupes + n_conflict + n_messy + n_missing + n_cycles
@@ -255,62 +310,88 @@ mod_ped_cleaner_server <- function(id, parent_session) {
         "<p style='color:", text_color, "; margin: 6px 0 0 0; font-size: 12px;'>",
         "- Exact duplicates removed: <strong>", n_dupes, "</strong> &nbsp;",
         "- Conflicting IDs resolved: <strong>", n_conflict, "</strong> &nbsp;",
-        "- Messy parents flagged: <strong>", n_messy, "</strong> &nbsp;",
+        "- Inconsistent parent sex roles flagged: <strong>", n_messy, "</strong> &nbsp;",
         "- Missing parents added: <strong>", n_missing, "</strong> &nbsp;",
         "- Cycles detected: <strong>", n_cycles, "</strong>",
         "</p></div>"
       ))
     })
     
-    #  Results section titles 
+    # Results UI
     output$results_ui <- shiny::renderUI({
       shiny::req(check_results())
       report <- check_results()$report
       
       get_count <- function(df) if (is.null(df) || !is.data.frame(df)) 0L else nrow(df)
       
-      make_section_title <- function(title, icon_name, df, color_hex) {
-        n <- get_count(df)
-        shiny::div(
-          style = paste0(
-            "background-color: #f8f9fa; border: 1px solid #dee2e6; ",
-            "padding: 10px 15px; margin-top: 10px; border-radius: 6px; ",
-            "border-left: 4px solid ", color_hex, ";"
-          ),
-          shiny::tagList(
+      make_section <- function(title, icon_name, df, color_hex) {
+        n      <- get_count(df)
+        tbl_id <- paste0("tbl_", sanitize_id(title))
+        bs4Dash::box(
+          title = shiny::tagList(
             shiny::icon(icon_name),
             shiny::strong(paste0(" ", title, ": ")),
             shiny::span(
               if (n == 0) "None found" else paste0(n, " record(s) found"),
               style = paste0("color: ", if (n == 0) "#28a745" else color_hex, ";")
             )
-          )
+          ),
+          width       = 12,
+          collapsible = TRUE,
+          collapsed   = (n == 0),
+          status      = if (n == 0) "success" else "warning",
+          style       = paste0("border-left: 4px solid ", color_hex, ";"),
+          if (n > 0) {
+            DT::DTOutput(session$ns(tbl_id))
+          } else {
+            shiny::p("No records found.", style = "color: #28a745; margin: 0;")
+          }
         )
       }
       
-      shiny::tagList(
+      sections <- shiny::tagList(
         shiny::h5(
           shiny::tagList(shiny::icon("list-check"), " Check Results"),
           style = "font-weight: bold; margin-bottom: 10px;"
         ),
-        make_section_title("Exact Duplicates Removed",       "copy",        report$exact_duplicates,  "#6c757d"),
-        make_section_title("Conflicting IDs Resolved",       "exclamation", report$repeated_ids_diff, "#856404"),
-        make_section_title("Messy Parents (Sire + Dam)",     "shuffle",     report$messy_parents,     "#856404"),
-        make_section_title("Missing Parents Added",          "user-plus",   report$missing_parents,   "#0c5460"),
-        make_section_title("Cycles / Dependencies Detected", "rotate",      report$dependencies,      "#721c24")
+        make_section("Exact Duplicates Removed",       "copy",        report$exact_duplicates,       "#6c757d"),
+        make_section("Conflicting IDs Resolved",       "exclamation", report$repeated_ids_diff,      "#856404"),
+        make_section("Inconsistent Parent Sex Roles",  "shuffle",     report$inconsistent_sex_roles, "#856404"),
+        make_section("Missing Parents Added",          "user-plus",   report$missing_parents,        "#0c5460"),
+        make_section("Cycles / Dependencies Detected", "rotate",      report$dependencies,           "#721c24")
       )
+      
+      render_if <- function(title, df) {
+        output_id <- paste0("tbl_", sanitize_id(title))
+        if (!is.null(df) && is.data.frame(df) && nrow(df) > 0) {
+          output[[output_id]] <- DT::renderDT({
+            DT::datatable(df,
+                          rownames = FALSE,
+                          options  = list(pageLength = 10, scrollX = TRUE),
+                          class    = "table-bordered table-sm")
+          })
+        }
+      }
+      
+      render_if("Exact Duplicates Removed",       report$exact_duplicates)
+      render_if("Conflicting IDs Resolved",       report$repeated_ids_diff)
+      render_if("Inconsistent Parent Sex Roles",  report$inconsistent_sex_roles)
+      render_if("Missing Parents Added",          report$missing_parents)
+      render_if("Cycles / Dependencies Detected", report$dependencies)
+      
+      sections
     })
     
-    #  Download 
+    # Download
     output$download_results <- shiny::downloadHandler(
       filename = function() {
         paste0("pedigree_check_", Sys.Date(), ".zip")
       },
       content = function(file) {
         shiny::req(check_results())
-        results  <- check_results()
-        report   <- results$report
-        tmp_dir  <- tempfile("ped_export")
+        results <- check_results()
+        report  <- results$report
+        tmp_dir <- tempfile("ped_export")
         dir.create(tmp_dir)
         
         if (!is.null(results$corrected_ped)) {
@@ -320,11 +401,11 @@ mod_ped_cleaner_server <- function(id, parent_session) {
         }
         
         sections <- list(
-          exact_duplicates = report$exact_duplicates,
-          conflicting_ids  = report$repeated_ids_diff,
-          messy_parents    = report$messy_parents,
-          missing_parents  = report$missing_parents,
-          dependencies     = report$dependencies
+          exact_duplicates       = report$exact_duplicates,
+          conflicting_ids        = report$repeated_ids_diff,
+          inconsistent_sex_roles = report$inconsistent_sex_roles,
+          missing_parents        = report$missing_parents,
+          dependencies           = report$dependencies
         )
         
         for (nm in names(sections)) {

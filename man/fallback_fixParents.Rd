@@ -4,14 +4,14 @@
 \alias{fallback_fixParents}
 \title{Fallback fixParents}
 \usage{
-fallback_fixParents(id, sire, dam, sex, missid = "0")
+fallback_fixParents(id, male_parent, female_parent, sex, missid = "0")
 }
 \arguments{
 \item{id}{vector of IDs}
 
-\item{sire}{vector of sires}
+\item{male_parent}{vector of male parents}
 
-\item{dam}{vector of dams}
+\item{female_parent}{vector of female parents}
 
 \item{sex}{vector of sex values}
 
