@@ -32,13 +32,13 @@ mod_ped_cleaner_ui <- function(id) {
             style = "color: #000000; margin-bottom: 15px; border-bottom: 1px solid #000000; padding-bottom: 8px;"
           ),
           shiny::p(
-            "Upload a tab-separated pedigree file with columns: id, male_parent, female_parent (or id, sire, dam).",
+            "Upload a pedigree file (.txt, .tsv, or .csv) with columns: id, male_parent, female_parent (or id, sire, dam).",
             style = "color: #6c757d; font-size: 12px; margin-bottom: 15px;"
           ),
           shiny::fileInput(
             ns("ped_file"),
             "Upload pedigree file",
-            accept = c(".txt", ".csv")
+            accept = c(".txt", ".tsv", ".csv")  # <-- added .tsv
           ),
           shiny::actionButton(
             ns("run_check"),
@@ -105,8 +105,7 @@ mod_ped_cleaner_server <- function(id, parent_session) {
     check_results <- shiny::reactiveVal(NULL)
     error_message <- shiny::reactiveVal("")
     
-    # Helpers 
-    
+    # Helpers
     make_collapse_panel <- function(panel_id, icon_name, label, body_content) {
       shiny::tags$div(
         class = "card mb-1",
@@ -138,8 +137,7 @@ mod_ped_cleaner_server <- function(id, parent_session) {
     
     sanitize_id <- function(x) gsub("[^A-Za-z0-9]", "_", tolower(x))
     
-    # Startup 
-    
+    # Startup
     output$dynamic_guide <- shiny::renderUI({
       current_error <- error_message()
       has_file      <- !is.null(input$ped_file)
@@ -163,7 +161,7 @@ mod_ped_cleaner_server <- function(id, parent_session) {
       }
       
       steps <- c(
-        sprintf("<p>%s <strong>Step 1:</strong> Upload your pedigree file (.txt or .csv)</p>",
+        sprintf("<p>%s <strong>Step 1:</strong> Upload your pedigree file (.txt, .tsv, or .csv)</p>",
                 get_icon(has_file)),
         sprintf("<p>%s <strong>Step 2:</strong> Click 'Run Pedigree Check' to detect and fix issues</p>",
                 get_icon(has_results)),
@@ -181,8 +179,7 @@ mod_ped_cleaner_server <- function(id, parent_session) {
       shiny::HTML(paste(steps, collapse = ""))
     })
     
-    # Help button 
-    
+    # Help button
     shiny::observeEvent(input$help_btn, {
       shiny::showModal(
         shiny::modalDialog(
@@ -190,14 +187,12 @@ mod_ped_cleaner_server <- function(id, parent_session) {
           size      = "l",
           easyClose = TRUE,
           footer    = shiny::modalButton("Close"),
-          # single source of truth
-          help_content_ped_cleaner(collapse_fn = make_collapse_panel)
-        )
+          # independent help module
+          help_content_ped_cleaner(collapse_fn = make_collapse_panel, id_prefix = "modal")        )
       )
     })
     
-    # Run check 
-    
+    # Run check
     shiny::observeEvent(input$run_check, {
       shiny::req(input$ped_file)
       error_message("")
@@ -213,8 +208,15 @@ mod_ped_cleaner_server <- function(id, parent_session) {
         )
         
         tmp_path <- input$ped_file$datapath
-        ped_raw  <- utils::read.table(tmp_path, header = TRUE, sep = "\t",
-                                      stringsAsFactors = FALSE, check.names = FALSE)
+        file_ext <- tolower(tools::file_ext(input$ped_file$name))  # <-- new
+        
+        ped_raw <- if (file_ext == "csv") {                         # <-- new
+          utils::read.csv(tmp_path, header = TRUE,
+                          stringsAsFactors = FALSE, check.names = FALSE)
+        } else {
+          utils::read.table(tmp_path, header = TRUE, sep = "\t",
+                            stringsAsFactors = FALSE, check.names = FALSE)
+        }
         
         if (all(c("sire", "dam") %in% colnames(ped_raw)) &&
             !all(c("male_parent", "female_parent") %in% colnames(ped_raw))) {
@@ -283,8 +285,7 @@ mod_ped_cleaner_server <- function(id, parent_session) {
       })
     })
     
-    # Summary banner 
-    
+    # Summary banner
     output$summary_banner <- shiny::renderUI({
       shiny::req(check_results())
       report <- check_results()$report
@@ -319,8 +320,7 @@ mod_ped_cleaner_server <- function(id, parent_session) {
       ))
     })
     
-    # Results UI 
-    
+    # Results UI
     output$results_ui <- shiny::renderUI({
       shiny::req(check_results())
       report <- check_results()$report
@@ -367,7 +367,7 @@ mod_ped_cleaner_server <- function(id, parent_session) {
       render_if <- function(title, df) {
         output_id <- paste0("tbl_", sanitize_id(title))
         if (!is.null(df) && is.data.frame(df) && nrow(df) > 0) {
-          output[[output_id]] <<- DT::renderDT({
+          output[[output_id]] <- DT::renderDT({
             DT::datatable(df,
                           rownames = FALSE,
                           options  = list(pageLength = 10, scrollX = TRUE),
@@ -385,8 +385,7 @@ mod_ped_cleaner_server <- function(id, parent_session) {
       sections
     })
     
-    # Download 
-    
+    # Download
     output$download_results <- shiny::downloadHandler(
       filename = function() {
         paste0("pedigree_check_", Sys.Date(), ".zip")

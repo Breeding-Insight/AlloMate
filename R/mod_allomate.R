@@ -271,8 +271,8 @@ mod_allomate_server <- function(id, parent_session) {
           easyClose = TRUE,
           footer    = shiny::modalButton("Close"),
           # ↓ single source of truth
-          help_content_allomate(collapse_fn = make_collapse_panel)
-        )
+          help_content_allomate(collapse_fn = make_collapse_panel, id_prefix = "modal")
+          )
       )
     })
     

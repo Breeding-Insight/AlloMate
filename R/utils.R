@@ -223,3 +223,48 @@ format_id_list <- function(ids, limit = 4) {
     paste(c(ids[seq_len(limit)], "(5 or more)"), collapse = ", ")
   }
 }
+
+#' Build a Bootstrap collapsible panel card
+#'
+#' A shared utility used by help content functions and module servers to render
+#' collapsible sub-panels in the UI.
+#'
+#' @param panel_id A unique string used as the HTML element id for the collapse target.
+#' @param icon_name A Font Awesome icon name passed to [shiny::icon()].
+#' @param label A string label displayed in the panel header button.
+#' @param body_content A shiny tag or [shiny::tagList()] rendered inside the panel body.
+#'
+#' @return A [shiny::tags$div()] structure representing a Bootstrap card with a
+#'   collapsible body.
+#'
+#' @importFrom shiny tags icon tagList
+#'
+#' @noRd
+make_collapse_panel <- function(panel_id, icon_name, label, body_content) {
+  shiny::tags$div(
+    class = "card mb-1",
+    style = "border: 1px solid #dee2e6; border-radius: 4px;",
+    shiny::tags$div(
+      class = "card-header p-0",
+      style = "background-color: #f8f9fa;",
+      shiny::tags$button(
+        class           = "btn btn-link btn-sm w-100 text-left d-flex align-items-center",
+        style           = "color: #343a40; text-decoration: none; font-size: 13px; padding: 8px 12px; gap: 6px;",
+        `data-toggle`   = "collapse",
+        `data-target`   = paste0("#", panel_id),
+        `aria-expanded` = "false",
+        shiny::icon(icon_name),
+        shiny::tags$span(label)
+      )
+    ),
+    shiny::tags$div(
+      id    = panel_id,
+      class = "collapse",
+      shiny::tags$div(
+        class = "card-body",
+        style = "padding: 12px 14px; font-size: 13px;",
+        body_content
+      )
+    )
+  )
+}

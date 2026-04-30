@@ -1,5 +1,4 @@
-# help_content_allomate.R
-
+# help_content_allomate.R  
 #' AlloMate help content
 #'
 #' Returns the UI content for the AlloMate help section.
@@ -7,10 +6,13 @@
 #'
 #' @param collapse_fn A function with signature (panel_id, icon_name, label, body_content)
 #'   used to build collapsible sub-panels. Defaults to the internal make_collapse_panel.
+#' @param id_prefix A string prefix to namespace panel IDs and avoid duplicate DOM ids.
 #'
 #' @noRd
-help_content_allomate <- function(collapse_fn = NULL) {
-  
+help_content_allomate <- function(collapse_fn = NULL, id_prefix = "") {
+
+  pid <- function(x) if (nchar(id_prefix) > 0) paste0(id_prefix, "_", x) else x
+
   if (is.null(collapse_fn)) {
     collapse_fn <- function(panel_id, icon_name, label, body_content) {
       shiny::tags$div(
@@ -41,9 +43,9 @@ help_content_allomate <- function(collapse_fn = NULL) {
       )
     }
   }
-  
+
   shiny::tagList(
-    
+
     shiny::h6(shiny::tagList(shiny::icon("circle-info"), " Overview"),
               style = "font-weight: bold;"),
     shiny::p(
@@ -54,7 +56,7 @@ help_content_allomate <- function(collapse_fn = NULL) {
       style = "font-size: 13px;"
     ),
     shiny::hr(style = "margin: 8px 0;"),
-    
+
     # ── Steps ────────────────────────────────────────────────────────
     shiny::h6(shiny::tagList(shiny::icon("list-ol"), " Steps"),
               style = "font-weight: bold;"),
@@ -91,15 +93,15 @@ help_content_allomate <- function(collapse_fn = NULL) {
       ))
     ),
     shiny::hr(style = "margin: 8px 0;"),
-    
+
     # ── Input File Formats ───────────────────────────────────────────
     shiny::h6(shiny::tagList(shiny::icon("file-lines"), " Input File Formats"),
               style = "font-weight: bold;"),
     shiny::p("Click each file type to expand format details.",
              style = "color: #6c757d; font-size: 12px; margin-bottom: 8px;"),
-    
+
     collapse_fn(
-      panel_id     = "am_help_candidates",
+      panel_id     = pid("am_help_candidates"),  # <-- prefixed
       icon_name    = "users",
       label        = "Candidate List (.csv or .txt)",
       body_content = shiny::tagList(
@@ -122,9 +124,9 @@ help_content_allomate <- function(collapse_fn = NULL) {
                  style = "font-size: 11px; color: #6c757d;")
       )
     ),
-    
+
     collapse_fn(
-      panel_id     = "am_help_pedigree",
+      panel_id     = pid("am_help_pedigree"),  # <-- prefixed
       icon_name    = "sitemap",
       label        = "Pedigree File (.txt)",
       body_content = shiny::tagList(
@@ -153,14 +155,14 @@ help_content_allomate <- function(collapse_fn = NULL) {
         ),
         shiny::p(
           shiny::HTML("Use <code>0</code> for unknown parents. The pedigree is automatically
-                       cleaned before kinship computation."),
+          cleaned before kinship computation."),
           style = "font-size: 11px; color: #6c757d;"
         )
       )
     ),
-    
+
     collapse_fn(
-      panel_id     = "am_help_ebv",
+      panel_id     = pid("am_help_ebv"),  # <-- prefixed
       icon_name    = "chart-line",
       label        = "Trait EBV File (.csv or .txt, one per trait)",
       body_content = shiny::tagList(
@@ -180,21 +182,21 @@ help_content_allomate <- function(collapse_fn = NULL) {
           )
         ),
         shiny::p("Upload one file per trait. Each file should cover the same set of candidates.
-                 Candidates without an EBV for any trait will be excluded from analysis.",
+        Candidates without an EBV for any trait will be excluded from analysis.",
                  style = "font-size: 11px; color: #6c757d;")
       )
     ),
-    
+
     shiny::hr(style = "margin: 8px 0;"),
-    
+
     # ── Parameters ───────────────────────────────────────────────────
     shiny::h6(shiny::tagList(shiny::icon("sliders"), " Parameters Explained"),
               style = "font-weight: bold;"),
     shiny::p("Click each parameter to expand its description.",
              style = "color: #6c757d; font-size: 12px; margin-bottom: 8px;"),
-    
+
     collapse_fn(
-      panel_id     = "am_help_thresh",
+      panel_id     = pid("am_help_thresh"),  # <-- prefixed
       icon_name    = "filter",
       label        = "Kinship Threshold",
       body_content = shiny::p(
@@ -206,7 +208,7 @@ help_content_allomate <- function(collapse_fn = NULL) {
       )
     ),
     collapse_fn(
-      panel_id     = "am_help_weights",
+      panel_id     = pid("am_help_weights"),  # <-- prefixed
       icon_name    = "balance-scale",
       label        = "Trait Weights",
       body_content = shiny::p(
@@ -217,7 +219,7 @@ help_content_allomate <- function(collapse_fn = NULL) {
       )
     ),
     collapse_fn(
-      panel_id     = "am_help_inbreeding",
+      panel_id     = pid("am_help_inbreeding"),  # <-- prefixed
       icon_name    = "arrows-to-circle",
       label        = "Desired Inbreeding Rate (OCS)",
       body_content = shiny::p(
@@ -228,7 +230,7 @@ help_content_allomate <- function(collapse_fn = NULL) {
       )
     ),
     collapse_fn(
-      panel_id     = "am_help_noffspring",
+      panel_id     = pid("am_help_noffspring"),  # <-- prefixed
       icon_name    = "baby",
       label        = "Number of Offspring (OCS)",
       body_content = shiny::p(
@@ -239,7 +241,7 @@ help_content_allomate <- function(collapse_fn = NULL) {
       )
     ),
     collapse_fn(
-      panel_id     = "am_help_greedy",
+      panel_id     = pid("am_help_greedy"),  # <-- prefixed
       icon_name    = "gear",
       label        = "Advanced OCS Options (optiSel required)",
       body_content = shiny::tagList(
@@ -264,9 +266,9 @@ help_content_allomate <- function(collapse_fn = NULL) {
         )
       )
     ),
-    
+
     shiny::hr(style = "margin: 8px 0;"),
-    
+
     # ── Output Tabs ──────────────────────────────────────────────────
     shiny::h6(shiny::tagList(shiny::icon("table-columns"), " Output Tabs"),
               style = "font-weight: bold;"),
@@ -283,9 +285,9 @@ help_content_allomate <- function(collapse_fn = NULL) {
         offspring counts."
       ))
     ),
-    
+
     shiny::hr(style = "margin: 8px 0;"),
-    
+
     # ── Export Contents ──────────────────────────────────────────────
     shiny::h6(shiny::tagList(shiny::icon("download"), " Export Contents"),
               style = "font-weight: bold;"),

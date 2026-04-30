@@ -35,7 +35,7 @@ mod_help_ui <- function(id) {
 mod_help_server <- function(id, parent_session = NULL) {
   shiny::moduleServer(id, function(input, output, session) {
     
-    # ── Top-level accordion panel builder ──────────────────────────
+    # Top-level accordion panel builder
     make_top_panel <- function(panel_id, icon_name, label, body_content) {
       shiny::tags$div(
         style = "margin-bottom: 8px;",
@@ -73,15 +73,13 @@ mod_help_server <- function(id, parent_session = NULL) {
           panel_id     = "allomate",
           icon_name    = "bullseye",
           label        = "Mate Allocation",
-          # ↓ single source of truth
-          body_content = help_content_allomate()
+          body_content = help_content_allomate(collapse_fn = make_collapse_panel, id_prefix = "page")
         ),
         make_top_panel(
           panel_id     = "ped_cleaner",
           icon_name    = "diagram-project",
           label        = "Pedigree Cleaner",
-          # ↓ single source of truth
-          body_content = help_content_ped_cleaner()
+          body_content = help_content_ped_cleaner(collapse_fn = make_collapse_panel, id_prefix = "page")
         )
       )
     })

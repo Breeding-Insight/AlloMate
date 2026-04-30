@@ -1,5 +1,4 @@
-# help_content_ped_cleaner.R
-
+# help_content_ped_cleaner.R  
 #' Pedigree Cleaner help content
 #'
 #' Returns the UI content for the Pedigree Cleaner help section.
@@ -7,9 +6,12 @@
 #'
 #' @param collapse_fn A function with signature (panel_id, icon_name, label, body_content).
 #'   Defaults to the internal make_collapse_panel.
+#' @param id_prefix A string prefix to namespace panel IDs and avoid duplicate DOM ids.
 #'
 #' @noRd
-help_content_ped_cleaner <- function(collapse_fn = NULL) {
+help_content_ped_cleaner <- function(collapse_fn = NULL, id_prefix = "") {
+  
+  pid <- function(x) if (nchar(id_prefix) > 0) paste0(id_prefix, "_", x) else x
   
   if (is.null(collapse_fn)) {
     collapse_fn <- function(panel_id, icon_name, label, body_content) {
@@ -86,7 +88,7 @@ help_content_ped_cleaner <- function(collapse_fn = NULL) {
     shiny::tags$ol(
       style = "font-size: 13px;",
       shiny::tags$li(shiny::HTML(
-        "<strong>Upload</strong> a tab-separated <code>.txt</code> or <code>.csv</code>
+        "<strong>Upload</strong> a tab-separated <code>.txt</code>, <code>.tsv</code>, or <code>.csv</code>
         file with three columns: <code>id</code>, <code>male_parent</code>, <code>female_parent</code>."
       )),
       shiny::tags$li(shiny::HTML("<strong>Run Pedigree Check</strong> — scans for all five issue types below.")),
@@ -104,7 +106,7 @@ help_content_ped_cleaner <- function(collapse_fn = NULL) {
              style = "color: #6c757d; font-size: 12px; margin-bottom: 8px;"),
     
     collapse_fn(
-      panel_id     = "pc_help_exact_dup",
+      panel_id     = pid("pc_help_exact_dup"),  # <-- prefixed
       icon_name    = "copy",
       label        = "Exact Duplicates Removed",
       body_content = shiny::tagList(
@@ -123,12 +125,12 @@ help_content_ped_cleaner <- function(collapse_fn = NULL) {
     ),
     
     collapse_fn(
-      panel_id     = "pc_help_conflict",
+      panel_id     = pid("pc_help_conflict"),  # <-- prefixed
       icon_name    = "exclamation",
       label        = "Conflicting IDs Resolved",
       body_content = shiny::tagList(
         shiny::p("The same individual ID appears with different parents.
-                 When a conflict is detected the ambiguous parent is set to 0 (unknown).",
+        When a conflict is detected the ambiguous parent is set to 0 (unknown).",
                  style = "margin-bottom: 6px;"),
         shiny::tags$strong("Before:"),
         ped_table(shiny::tagList(
@@ -145,12 +147,12 @@ help_content_ped_cleaner <- function(collapse_fn = NULL) {
     ),
     
     collapse_fn(
-      panel_id     = "pc_help_messy",
+      panel_id     = pid("pc_help_messy"),  # <-- prefixed
       icon_name    = "shuffle",
       label        = "Inconsistent Parent Sex Roles",
       body_content = shiny::tagList(
         shiny::p("An individual appears in the male_parent column in one record and the female_parent
-                 column in another, indicating an inconsistent sex/role assignment across the pedigree.",
+        column in another, indicating an inconsistent sex/role assignment across the pedigree.",
                  style = "margin-bottom: 6px;"),
         shiny::tags$strong("Before:"),
         ped_table(shiny::tagList(
@@ -163,7 +165,7 @@ help_content_ped_cleaner <- function(collapse_fn = NULL) {
     ),
     
     collapse_fn(
-      panel_id     = "pc_help_missing",
+      panel_id     = pid("pc_help_missing"),  # <-- prefixed
       icon_name    = "user-plus",
       label        = "Missing Parents Added",
       body_content = shiny::tagList(
@@ -183,7 +185,7 @@ help_content_ped_cleaner <- function(collapse_fn = NULL) {
     ),
     
     collapse_fn(
-      panel_id     = "pc_help_cycles",
+      panel_id     = pid("pc_help_cycles"),  # <-- prefixed
       icon_name    = "rotate",
       label        = "Cycles / Dependencies Detected",
       body_content = shiny::tagList(
@@ -195,7 +197,7 @@ help_content_ped_cleaner <- function(collapse_fn = NULL) {
           ped_row("B1", "A1", "C2", bg = "#f8d7da")
         )),
         shiny::p(shiny::HTML("<strong>A1</strong> is listed as the male_parent of <strong>B1</strong>, but <strong>B1</strong>
-                 is also listed as the male_parent of <strong>A1</strong> — flagged for review."),
+        is also listed as the male_parent of <strong>A1</strong> — flagged for review."),
                  style = "color: #721c24; font-size: 11px;")
       )
     ),
@@ -209,9 +211,9 @@ help_content_ped_cleaner <- function(collapse_fn = NULL) {
       style = "font-size: 13px;",
       shiny::tags$li(shiny::HTML("<code>corrected_pedigree.txt</code> — the cleaned pedigree, tab-separated.")),
       shiny::tags$li(shiny::HTML("One <code>.txt</code> report per issue type (only included if issues were found):
-        <code>exact_duplicates.txt</code>, <code>conflicting_ids.txt</code>,
-        <code>inconsistent_sex_roles.txt</code>, <code>missing_parents.txt</code>,
-        <code>dependencies.txt</code>."))
+      <code>exact_duplicates.txt</code>, <code>conflicting_ids.txt</code>,
+      <code>inconsistent_sex_roles.txt</code>, <code>missing_parents.txt</code>,
+      <code>dependencies.txt</code>."))
     )
   )
 }
