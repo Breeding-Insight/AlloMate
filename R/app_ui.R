@@ -26,7 +26,10 @@ app_ui <- function(request) {
         skin          = "light",
         status        = "danger",
         fixed         = TRUE,
-        expandOnHover = TRUE,
+        sidebarCollapsible = TRUE,
+        sidebarCollapsed   = FALSE,
+        expandOnHover      = FALSE,
+        
         bs4Dash::sidebarMenu(
           id   = "MainMenu",
           flat = FALSE,
@@ -52,6 +55,11 @@ app_ui <- function(request) {
             class = "header",
             style = "color: grey; margin-top: 18px; margin-bottom: 10px; padding-left: 15px;",
             "Information"
+          ),
+          bs4Dash::menuItem(
+            "Source Code",
+            icon = shiny::icon("circle-info"),
+            href = "https://github.com/Breeding-Insight/AlloMate"
           ),
           bs4Dash::menuItem("Help", tabName = "help", icon = shiny::icon("circle-question"))
         )
@@ -94,7 +102,7 @@ app_ui <- function(request) {
           )
         ),
         bs4Dash::tabItems(
-          bs4Dash::tabItem(tabName = "home",        mod_home_ui("home_1")),
+          bs4Dash::tabItem(tabName = "home", mod_Home_ui("Home_1")),
           bs4Dash::tabItem(tabName = "ped_cleaner", mod_ped_cleaner_ui("ped_cleaner_1")),
           bs4Dash::tabItem(tabName = "allomate",    mod_allomate_ui("allomate_1")),
           bs4Dash::tabItem(tabName = "help",        mod_help_ui("help_1"))
@@ -103,3 +111,4 @@ app_ui <- function(request) {
     )
   )
 }
+
