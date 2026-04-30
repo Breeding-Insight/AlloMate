@@ -221,37 +221,8 @@ mod_allomate_server <- function(id, parent_session) {
       candidates = character(),
       ebvs       = character()
     )
-
-    # Collapse Panel
-    make_collapse_panel <- function(panel_id, icon_name, label, body_content) {
-      shiny::tags$div(
-        class = "card mb-1",
-        style = "border: 1px solid #dee2e6; border-radius: 4px;",
-        shiny::tags$div(
-          class = "card-header p-0",
-          style = "background-color: #f8f9fa;",
-          shiny::tags$button(
-            class           = "btn btn-link btn-sm w-100 text-left d-flex align-items-center",
-            style           = "color: #343a40; text-decoration: none; font-size: 13px; padding: 8px 12px; gap: 6px;",
-            `data-toggle`   = "collapse",
-            `data-target`   = paste0("#", panel_id),
-            `aria-expanded` = "false",
-            shiny::icon(icon_name),
-            shiny::tags$span(label)
-          )
-        ),
-        shiny::tags$div(
-          id    = panel_id,
-          class = "collapse",
-          shiny::tags$div(
-            class = "card-body",
-            style = "padding: 12px 14px; font-size: 13px;",
-            body_content
-          )
-        )
-      )
-    }
-    ####Package status ####
+    
+    #### Package status ####
     output$package_status_text <- shiny::renderText({ generate_package_status() })
     optisel_available      <- requireNamespace("optiSel", quietly = TRUE)
     ocs_checkboxes_enabled <- optisel_available
@@ -262,6 +233,7 @@ mod_allomate_server <- function(id, parent_session) {
     if (optisel_available) {
       options(allomate.force_greedy_mating = FALSE, allomate.force_qp_greedy = FALSE)
     }
+    
     #### Help button ####
     shiny::observeEvent(input$help_btn, {
       shiny::showModal(
@@ -270,9 +242,8 @@ mod_allomate_server <- function(id, parent_session) {
           size      = "l",
           easyClose = TRUE,
           footer    = shiny::modalButton("Close"),
-          # ↓ single source of truth
           help_content_allomate(collapse_fn = make_collapse_panel, id_prefix = "modal")
-          )
+        )
       )
     })
     
@@ -284,6 +255,7 @@ mod_allomate_server <- function(id, parent_session) {
     error_message             <- shiny::reactiveVal("")
     pedigree_validation_stats <- shiny::reactiveVal(NULL)
     ebv_data <- shiny::reactive({ process_ebvs(trait_counter(), input) })
+    
     #### Export cache ####
     export_cache <- shiny::reactiveVal(NULL)
     generate_export_zip <- function(dest_zip) {
@@ -361,6 +333,7 @@ mod_allomate_server <- function(id, parent_session) {
       unlink(tmp_dir, recursive = TRUE)
       TRUE
     }
+    
     shiny::observeEvent(
       list(ebv_results_reactive(), ocs_results_reactive(),
            input$thresh, input$inbreeding_rate, input$num_offspring),
@@ -374,10 +347,12 @@ mod_allomate_server <- function(id, parent_session) {
       },
       ignoreNULL = FALSE
     )
+    
     session$onSessionEnded(function() {
       cache <- shiny::isolate(export_cache())
       if (!is.null(cache) && file.exists(cache)) unlink(cache, force = TRUE)
     })
+    
     output$download_all_results <- shiny::downloadHandler(
       filename = function() paste0("AlloMate_results-", Sys.Date(), ".zip"),
       content  = function(file) {
@@ -391,6 +366,7 @@ mod_allomate_server <- function(id, parent_session) {
       contentType = "application/zip"
     )
     shiny::outputOptions(output, "download_all_results", suspendWhenHidden = FALSE)
+    
     #### Startup ####
     output$dynamic_guide <- shiny::renderUI({
       current_error <- error_message()
@@ -443,6 +419,7 @@ mod_allomate_server <- function(id, parent_session) {
       }
       shiny::HTML(paste(steps, collapse = ""))
     })
+    
     #### File status display ####
     output$file_status_display <- shiny::renderUI({
       has_candidates <- !is.null(input$candidate_file)
@@ -514,6 +491,7 @@ mod_allomate_server <- function(id, parent_session) {
         download_status
       ))
     })
+    
     #### Pedigree status display ####
     output$pedigree_status_display <- shiny::renderUI({
       stats <- pedigree_validation_stats()
@@ -559,7 +537,8 @@ mod_allomate_server <- function(id, parent_session) {
       } else ""
       shiny::HTML(paste0(green_box, yellow_box, red_box))
     })
-    ##### Trait counter ####
+    
+    #### Trait counter ####
     shiny::observeEvent(input$add_trait,    { trait_counter(trait_counter() + 1) })
     shiny::observeEvent(input$remove_trait, { if (trait_counter() > 1) trait_counter(trait_counter() - 1) })
     output$trait_inputs <- shiny::renderUI({ create_trait_inputs(trait_counter(), ns = ns) })
@@ -567,6 +546,7 @@ mod_allomate_server <- function(id, parent_session) {
       shiny::req(input$ocs_trait_counter)
       create_ocs_trait_inputs(input$ocs_trait_counter, ns = ns)
     })
+    
     #### Candidates ####
     candidates_data <- shiny::reactive({
       shiny::req(input$candidate_file)
@@ -591,6 +571,7 @@ mod_allomate_server <- function(id, parent_session) {
         NULL
       })
     })
+    
     #### Pedigree ####
     pedigree_data <- shiny::reactiveVal(NULL)
     shiny::observeEvent(input$pedigree_file, {
@@ -603,6 +584,17 @@ mod_allomate_server <- function(id, parent_session) {
       )
       tryCatch({
         raw_ped <- readr::read_table(input$pedigree_file$datapath)
+        
+        required_cols <- c("id", "male_parent", "female_parent")
+        missing_cols  <- setdiff(required_cols, colnames(raw_ped))
+        if (length(missing_cols) > 0) {
+          stop(paste0(
+            "Missing required column(s): ",
+            paste(missing_cols, collapse = ", "),
+            ". File must contain: id, male_parent, female_parent."
+          ))
+        }
+        
         cleaned_ped <- clean_pedigree(raw_ped, return_stats = TRUE)
         final_ped   <- cleaned_ped$pedigree
         candidate_ids         <- candidates_data()$candidates$id
@@ -666,12 +658,14 @@ mod_allomate_server <- function(id, parent_session) {
         )
       })
     })
+    
     shiny::observe({
       if (is.null(ebv_data())) {
         output$message2             <- shiny::renderUI(NULL)
         output$candidate_ebv_status <- shiny::renderUI(NULL)
       }
     })
+    
     output$ebv_upload_prompt <- shiny::renderUI({
       if (!is.null(pedigree_data()) && is.null(ebv_data())) {
         shiny::tags$pre(class = "shiny-text-output", "Please upload trait EBVs.")
@@ -679,6 +673,7 @@ mod_allomate_server <- function(id, parent_session) {
         NULL
       }
     })
+    
     #### EBV observe ####
     shiny::observe({
       shiny::req(candidates_data())
@@ -774,7 +769,8 @@ mod_allomate_server <- function(id, parent_session) {
         session = session, id = "pb_allomate",
         value = 80, status = "info", title = "EBV matrix ready. Run OCS to complete analysis."
       )
-      ##### Candidate-EBV status UI ####
+      
+      #### Candidate-EBV status UI ####
       total_candidates <- dplyr::n_distinct(cands$id)
       total_ebvs       <- length(ebv_ids)
       candidate_match_ui <- if (total_candidates > 0 &&
@@ -827,6 +823,7 @@ mod_allomate_server <- function(id, parent_session) {
         )
       )
     })
+    
     output$download_missing_candidates <- shiny::downloadHandler(
       filename = function() paste0("candidates_missing_ebvs_", Sys.Date(), ".txt"),
       content  = function(file) {
@@ -835,15 +832,18 @@ mod_allomate_server <- function(id, parent_session) {
         writeLines(lines, con = file)
       }
     )
+    
     #### OCS server logic ####
     shiny::observeEvent(input$force_greedy_mating, {
       if (!ocs_checkboxes_enabled) return(NULL)
       options(allomate.force_greedy_mating = isTRUE(input$force_greedy_mating))
     }, ignoreNULL = FALSE)
+    
     shiny::observeEvent(input$force_qp_greedy, {
       if (!ocs_checkboxes_enabled) return(NULL)
       options(allomate.force_qp_greedy = isTRUE(input$force_qp_greedy))
     }, ignoreNULL = FALSE)
+    
     shiny::observeEvent(input$run_ocs_btn, {
       shiny::req(input$pedigree_file, input$candidate_file)
       if (ocs_checkboxes_enabled) {
@@ -861,6 +861,17 @@ mod_allomate_server <- function(id, parent_session) {
       tryCatch({
         ped_data   <- read.table(input$pedigree_file$datapath, header = TRUE, stringsAsFactors = FALSE)
         candidates <- read.table(input$candidate_file$datapath, header = TRUE, stringsAsFactors = FALSE)
+        
+        required_cols <- c("id", "male_parent", "female_parent")
+        missing_cols  <- setdiff(required_cols, colnames(ped_data))
+        if (length(missing_cols) > 0) {
+          stop(paste0(
+            "Missing required column(s): ",
+            paste(missing_cols, collapse = ", "),
+            ". File must contain: id, male_parent, female_parent."
+          ))
+        }
+        
         final_ped  <- clean_pedigree(ped_data)
         shinyWidgets::updateProgressBar(
           session = session, id = "pb_allomate",
@@ -948,6 +959,7 @@ mod_allomate_server <- function(id, parent_session) {
         )
       })
     })
+    
     output$ocs_mating_table <- DT::renderDT({
       shiny::req(ocs_results_reactive())
       formatted_results <- format_ocs_results(ocs_results_reactive())
@@ -958,6 +970,7 @@ mod_allomate_server <- function(id, parent_session) {
       }
       DT::datatable(mating_tbl, options = list(pageLength = 10, autoWidth = TRUE), rownames = FALSE)
     })
+    
     output$ocs_solver_note <- shiny::renderUI({
       shiny::req(ocs_results_reactive())
       info <- format_ocs_results(ocs_results_reactive())$summary_stats$mating_info

@@ -32,13 +32,13 @@ mod_ped_cleaner_ui <- function(id) {
             style = "color: #000000; margin-bottom: 15px; border-bottom: 1px solid #000000; padding-bottom: 8px;"
           ),
           shiny::p(
-            "Upload a pedigree file (.txt, .tsv, or .csv) with columns: id, male_parent, female_parent (or id, sire, dam).",
+            "Upload a pedigree file (.txt, .tsv, or .csv) with columns: id, male_parent, female_parent.",
             style = "color: #6c757d; font-size: 12px; margin-bottom: 15px;"
           ),
           shiny::fileInput(
             ns("ped_file"),
             "Upload pedigree file",
-            accept = c(".txt", ".tsv", ".csv")  # <-- added .tsv
+            accept = c(".txt", ".tsv", ".csv")
           ),
           shiny::actionButton(
             ns("run_check"),
@@ -175,7 +175,6 @@ mod_ped_cleaner_server <- function(id, parent_session) {
                    "<p style='color: #28a745; font-weight: bold;'>Your corrected pedigree is ready to download.</p>"
         )
       }
-      
       shiny::HTML(paste(steps, collapse = ""))
     })
     
@@ -187,8 +186,8 @@ mod_ped_cleaner_server <- function(id, parent_session) {
           size      = "l",
           easyClose = TRUE,
           footer    = shiny::modalButton("Close"),
-          # independent help module
-          help_content_ped_cleaner(collapse_fn = make_collapse_panel, id_prefix = "modal")        )
+          help_content_ped_cleaner(collapse_fn = make_collapse_panel, id_prefix = "modal")
+        )
       )
     })
     
@@ -197,7 +196,6 @@ mod_ped_cleaner_server <- function(id, parent_session) {
       shiny::req(input$ped_file)
       error_message("")
       check_results(NULL)
-      
       shinyjs::disable(session$ns("download_results"))
       
       tryCatch({
@@ -208,9 +206,9 @@ mod_ped_cleaner_server <- function(id, parent_session) {
         )
         
         tmp_path <- input$ped_file$datapath
-        file_ext <- tolower(tools::file_ext(input$ped_file$name))  # <-- new
+        file_ext <- tolower(tools::file_ext(input$ped_file$name))
         
-        ped_raw <- if (file_ext == "csv") {                         # <-- new
+        ped_raw <- if (file_ext == "csv") {
           utils::read.csv(tmp_path, header = TRUE,
                           stringsAsFactors = FALSE, check.names = FALSE)
         } else {
@@ -218,13 +216,14 @@ mod_ped_cleaner_server <- function(id, parent_session) {
                             stringsAsFactors = FALSE, check.names = FALSE)
         }
         
-        if (all(c("sire", "dam") %in% colnames(ped_raw)) &&
-            !all(c("male_parent", "female_parent") %in% colnames(ped_raw))) {
-          colnames(ped_raw)[colnames(ped_raw) == "sire"] <- "male_parent"
-          colnames(ped_raw)[colnames(ped_raw) == "dam"]  <- "female_parent"
-          tmp_path <- tempfile(fileext = ".txt")
-          utils::write.table(ped_raw, tmp_path, sep = "\t",
-                             row.names = FALSE, quote = FALSE)
+        required_cols <- c("id", "male_parent", "female_parent")
+        missing_cols  <- setdiff(required_cols, colnames(ped_raw))
+        if (length(missing_cols) > 0) {
+          stop(paste0(
+            "Missing required column(s): ",
+            paste(missing_cols, collapse = ", "),
+            ". File must contain: id, male_parent, female_parent."
+          ))
         }
         
         shinyWidgets::updateProgressBar(
@@ -271,7 +270,6 @@ mod_ped_cleaner_server <- function(id, parent_session) {
           value = 100, status = "success",
           title = "Finished"
         )
-        
         shinyjs::enable(session$ns("download_results"))
         
       }, error = function(e) {
@@ -291,7 +289,6 @@ mod_ped_cleaner_server <- function(id, parent_session) {
       report <- check_results()$report
       
       get_count <- function(df) if (is.null(df) || !is.data.frame(df)) 0L else nrow(df)
-      
       n_dupes    <- get_count(report$exact_duplicates)
       n_conflict <- get_count(report$repeated_ids_diff)
       n_messy    <- get_count(report$inconsistent_sex_roles)
@@ -394,7 +391,6 @@ mod_ped_cleaner_server <- function(id, parent_session) {
         shiny::req(check_results())
         results <- check_results()
         report  <- results$report
-        
         tmp_dir <- tempfile("ped_export")
         dir.create(tmp_dir)
         
