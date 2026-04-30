@@ -30,11 +30,6 @@ mod_home_ui <- function(id) {
           ),
           shiny::tags$p(
             "Use the Mate Allocation tab to upload your data, configure parameters, run OCS, and export results."
-          ),
-          shiny::actionButton(
-            ns("go_allomate"),
-            "Start Analysis",
-            class = "btn-primary"
           )
         ),
         bs4Dash::box(
