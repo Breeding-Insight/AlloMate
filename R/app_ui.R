@@ -59,7 +59,8 @@ app_ui <- function(request) {
           bs4Dash::menuItem(
             "Source Code",
             icon = shiny::icon("circle-info"),
-            href = "https://github.com/Breeding-Insight/AlloMate"
+            href = "https://github.com/Breeding-Insight/AlloMate",
+            newTab = TRUE
           ),
           bs4Dash::menuItem("Help", tabName = "help", icon = shiny::icon("circle-question"))
         )
