@@ -114,7 +114,7 @@ mod_Home_ui <- function(id){
                    includes applications like BIGapp, Qploidy, and GenoBrew, PLUS all of our newly released applications.
                    Learn more and see install instructions here
                     <div style='text-align: center; margin-top: 20px;'>
-                      <img src='www/BreedingInsight.png' alt='Breeding Insight' style='width: 85px; height: 85px;'>
+                      <img src='www/breedverse_logo.png' alt='Breedingverse' style='width: 120px; height: 140px;'>
                     </div>"
                         ),
                         style = "overflow-y: auto; height: 300px"

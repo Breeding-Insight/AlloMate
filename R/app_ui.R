@@ -5,8 +5,18 @@
 #'
 #' @noRd
 app_ui <- function(request) {
-  shiny::tagList(
+  tagList(
+    # Leave this function for adding external resources
     golem_add_external_resources(),
+    # Dynamic sidebar color theme — only sets the :root CSS variables
+    # ── Sidebar color theme ──────────────────────────────────────────────────────
+    # Change this value to switch the active sidebar menu item color.
+    # Available options: "azure", "green", "yellow", "grey", "purple", "red"
+    # ─────────────────────────────────────────────────────────────────────────────
+    tags$head(tags$style(HTML(sprintf(
+      ":root { --sidebar-core: var(--%s-core); --sidebar-lite: var(--%s-lite); --sidebar-deep: var(--%s-deep); }",
+      "red", "red", "red"
+    )))),
     bs4Dash::bs4DashPage(
       title = "AlloMate",
       skin  = "black",
@@ -112,4 +122,3 @@ app_ui <- function(request) {
     )
   )
 }
-

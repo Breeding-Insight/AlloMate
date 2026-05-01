@@ -1,36 +1,45 @@
-(function () {
-  function scrollHelpToAnchor(anchorId) {
-    if (!anchorId) return;
-    var container = document.querySelector(".help-content");
-    var target = document.getElementById(anchorId);
-    if (!container || !target) return;
-
-    var containerTop = container.getBoundingClientRect().top;
-    var targetTop = target.getBoundingClientRect().top;
-    var scrollTop = container.scrollTop + (targetTop - containerTop) - 8;
-    container.scrollTo({ top: scrollTop, behavior: "smooth" });
+$(document).ready(function() {
+  // Use event delegation for dynamically created elements
+  $(document).on('click', '.card-header', function(e) {
+    // Don't trigger if clicking on the actual collapse button
+    if (!$(e.target).closest('.card-tools').length) {
+      // Find the collapse button in this header and trigger click
+      var collapseBtn = $(this).find('[data-card-widget="collapse"]');
+      if (collapseBtn.length > 0) {
+        collapseBtn.trigger('click');
+      }
+    }
+  });
+  
+  // Function to apply styles to card headers (both existing and new ones)
+  function styleCardHeaders() {
+    $('.card-header').css('cursor', 'pointer');
+    $('.card-tools').css('cursor', 'default');
   }
-
-  document.addEventListener("click", function (e) {
-    var link = e.target && e.target.closest ? e.target.closest("a.toc-link") : null;
-    if (!link) return;
-    var href = link.getAttribute("href") || "";
-    if (!href.startsWith("#")) return;
-    e.preventDefault();
-    scrollHelpToAnchor(href.slice(1));
+  
+  // Apply styles initially
+  styleCardHeaders();
+  
+  // Watch for new elements and apply styles
+  var observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+      if (mutation.addedNodes.length > 0) {
+        styleCardHeaders();
+      }
+    });
+  });
+  
+  // Start observing
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
   });
 
-  function registerHandlers() {
-    if (!window.Shiny || !window.Shiny.addCustomMessageHandler) return false;
-    window.Shiny.addCustomMessageHandler("ocs-scroll", function (msg) {
-      if (!msg) return;
-      scrollHelpToAnchor(msg.anchor);
-    });
-    return true;
-  }
+  // Your existing tab script
+  $('#cnv_1-sample_select_tabs li.active > a').addClass('active');
 
-  if (!registerHandlers()) {
-    document.addEventListener("shiny:connected", registerHandlers);
-  }
-})();
-
+  $(document).on('shown.bs.tab', '#cnv_1-sample_select_tabs a[data-toggle="tab"]', function(e) {
+    $('#cnv_1-sample_select_tabs a[data-toggle="tab"]').removeClass('active');
+    $(e.target).addClass('active');
+  });
+});
