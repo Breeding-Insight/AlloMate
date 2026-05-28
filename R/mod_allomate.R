@@ -5,87 +5,90 @@
 #' @noRd
 mod_allomate_ui <- function(id) {
   ns <- shiny::NS(id)
+  
   # Override: Chromium download attribute bug fix
   downloadButton <- function(...) {
     tag <- shiny::downloadButton(...)
     tag$attribs$download <- NULL
     tag
   }
+  
   shiny::tagList(
-    shiny::sidebarLayout(
-      shiny::sidebarPanel(
-        shiny::div(
-          style = "background-color: #ffffff; border: 2px solid #444444; padding: 15px; margin-bottom: 20px; border-radius: 8px;",
-          shiny::h4(
-            shiny::tagList(shiny::icon("gear"), "Getting Started"),
-            style = "color: #000000; margin-bottom: 15px; border-bottom: 1px solid black; padding-bottom: 8px;"
-          ),
-          shiny::htmlOutput(ns("dynamic_guide")),
-          shiny::div(
-            style = "text-align: center; margin-top: 15px; padding-top: 10px; border-top: 1px solid #dee2e6;",
-            shiny::actionButton(
-              ns("help_btn"),
-              shiny::tagList(shiny::icon("circle-question"), "Help"),
-              style = "background-color: #FFD700; color: #000000; border:none; padding: 8px 16px; border-radius: 5px;"
-            )
-          )
-        ),
-        shiny::wellPanel(
-          style = "background-color: #ffffff; border: 2px solid #444444; padding: 15px; margin-bottom: 20px; border-radius: 8px;",
-          shiny::h4(
-            shiny::tagList(shiny::icon("sitemap"), "Core Data Inputs"),
-            style = "color: #000000; margin-bottom: 15px; border-bottom: 1px solid #000000; padding-bottom: 8px;"
-          ),
+    shiny::fluidRow(
+      
+      # Column 1: Inputs
+      shiny::column(
+        width = 3,
+        bs4Dash::box(
+          title       = "Inputs",
+          width       = 12,
+          collapsible = TRUE,
+          collapsed   = FALSE,
+          status      = "info",
+          solidHeader = TRUE,
+          
           shiny::p(
-            "These inputs are used by both Index Generation and OCS calculations:",
+            "Upload required files and configure parameters below.",
             style = "color: #6c757d; font-size: 12px; margin-bottom: 15px;"
           ),
-          shiny::h5("Estimate progeny genetic merit"),
+          
+          # --- Core Data ---
+          shiny::h5(
+            shiny::tagList(shiny::icon("sitemap"), " Core Data Inputs"),
+            style = "border-bottom: 1px solid #dee2e6; padding-bottom: 6px; margin-bottom: 10px;"
+          ),
+          shiny::p(
+            "Used by both Index Generation and OCS calculations:",
+            style = "color: #6c757d; font-size: 12px; margin-bottom: 10px;"
+          ),
+          shiny::h6("Estimate progeny genetic merit"),
           shiny::fileInput(ns("candidate_file"), "Upload list of candidates", accept = c(".csv", ".txt")),
-          shiny::h5("Calculate kinship matrix"),
+          shiny::h6("Calculate kinship matrix"),
           shiny::fileInput(ns("pedigree_file"), "Upload pedigree file", accept = ".txt"),
           shiny::uiOutput(ns("pedigree_status_display")),
-          shiny::h5("Set kinship threshold"),
+          shiny::h6("Set kinship threshold"),
           shiny::numericInput(
             ns("thresh"),
             "Max kinship allowed between mates:",
             value = 1, min = 0, max = 1, step = 0.1
-          )
-        ),
-        shiny::wellPanel(
-          style = "background-color: #ffffff; border: 2px solid #444444; padding: 15px; margin-bottom: 20px; border-radius: 8px;",
-          shiny::h4(
+          ),
+          
+          shiny::hr(),
+          
+          # --- Weighted EBVs ---
+          shiny::h5(
             shiny::tagList(shiny::icon("balance-scale"), " Weighted EBVs"),
-            style = "color: #000000; margin-bottom: 15px; border-bottom: 1px solid #000000; padding-bottom: 8px;"
+            style = "border-bottom: 1px solid #dee2e6; padding-bottom: 6px; margin-bottom: 10px;"
           ),
           shiny::p(
             "Define traits and their relative importance for breeding decisions:",
-            style = "color: #6c757d; font-size: 12px; margin-bottom: 15px;"
+            style = "color: #6c757d; font-size: 12px; margin-bottom: 10px;"
           ),
-          shiny::h5("Traits (EBVs and weights)"),
+          shiny::h6("Traits (EBVs and weights)"),
           shiny::uiOutput(ns("trait_inputs")),
           shiny::fluidRow(
-            shiny::column(6, shiny::actionButton(ns("add_trait"), "+ Add trait")),
+            shiny::column(6, shiny::actionButton(ns("add_trait"),    "+ Add trait")),
             shiny::column(6, shiny::actionButton(ns("remove_trait"), "- Remove trait"))
           ),
           shiny::p(
             "Note: Adding or removing traits will require re-uploading files.",
             style = "color: #6c757d; font-size: 11px; font-style: italic; margin-top: 8px;"
-          )
-        ),
-        shiny::wellPanel(
-          style = "background-color: #ffffff; border: 2px solid #444444; padding: 15px; margin-bottom: 20px; border-radius: 8px;",
-          shiny::h4(
+          ),
+          
+          shiny::hr(),
+          
+          # --- OCS ---
+          shiny::h5(
             shiny::tagList(shiny::icon("bullseye"), " Optimum Contribution Selection"),
-            style = "color: #000000; margin-bottom: 15px; border-bottom: 1px solid #000000; padding-bottom: 8px;"
+            style = "border-bottom: 1px solid #dee2e6; padding-bottom: 6px; margin-bottom: 10px;"
           ),
           shiny::p(
             "Configure breeding objectives and constraints:",
-            style = "color: #6c757d; font-size: 12px; margin-bottom: 15px;"
+            style = "color: #6c757d; font-size: 12px; margin-bottom: 10px;"
           ),
           shiny::verbatimTextOutput(ns("package_status_text")),
           shiny::div(style = "display:none;", shiny::textOutput(ns("ocs_checkbox_mode"))),
-          shiny::h5("Breeding Objectives"),
+          shiny::h6("Breeding Objectives"),
           shiny::numericInput(
             ns("inbreeding_rate"), "Desired Inbreeding Rate",
             value = 0.05, min = 0.01, max = 0.2, step = 0.01
@@ -114,98 +117,167 @@ mod_allomate_ui <- function(id) {
           ),
           shiny::actionButton(
             ns("run_ocs_btn"), "Run OCS",
-            style = "margin-top: 15px; width: 100%; background-color: #28a745; color: white; border: none; padding: 10px; border-radius: 5px;"
-          )
-        ),
-        shiny::wellPanel(
-          style = "background-color: #ffffff; border: 2px solid #444444; padding: 15px; margin-bottom: 20px; border-radius: 8px;",
-          shiny::h4(
-            shiny::tagList(shiny::icon("bar-chart"), "Export Results"),
-            style = "color: #000000; margin-bottom: 15px; border-bottom: 1px solid #c3e6cb; padding-bottom: 8px;"
+            style = "margin-top: 10px; width: 100%; background-color: #28a745; color: white; border: none; padding: 10px; border-radius: 5px;"
+          ),
+          
+          shiny::hr(),
+          
+          # --- Export ---
+          shiny::h5(
+            shiny::tagList(shiny::icon("bar-chart"), " Export Results"),
+            style = "border-bottom: 1px solid #dee2e6; padding-bottom: 6px; margin-bottom: 10px;"
           ),
           shiny::p(
             "Download all results in a single zip file:",
-            style = "color: #6c757d; font-size: 12px; margin-bottom: 15px;"
+            style = "color: #6c757d; font-size: 12px; margin-bottom: 10px;"
           ),
           downloadButton(
             ns("download_all_results"), "Export All Results",
             style = "width: 100%; background-color: #28a745; color: white; border: none; padding: 10px; border-radius: 5px; margin-bottom: 10px;"
           ),
-          shiny::div(
-            style = "background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 12px; margin-bottom: 10px; border-radius: 5px;",
-            shiny::h5(
-              shiny::tagList(shiny::icon("file"), "File Status"),
-              style = "color: #495057; margin-top: 0; margin-bottom: 10px; font-size: 14px;"
-            ),
-            shiny::htmlOutput(ns("file_status_display"))
-          ),
+          
+          shiny::hr(),
+          
           shiny::tags$a(
-            href       = "https://github.com/Breeding-Insight/AlloMate",
-            target     = "_blank",
-            class      = "btn btn-info",
-            style      = "width: 100%; background-color: #17a2b8; color: white; border: none; padding: 10px; border-radius: 5px; text-align: center;",
-            shiny::tagList(shiny::icon("github"), "Visit GitHub repository")
-          )
-        )
-      ),
-      shiny::mainPanel(
-        shiny::fluidRow(
-          shiny::column(
-            width = 12,
-            bs4Dash::box(
-              title       = "Status",
-              width       = 12,
-              collapsible = TRUE,
-              status      = "info",
-              shinyWidgets::progressBar(
-                id          = ns("pb_allomate"),
-                value       = 0,
-                status      = "info",
-                display_pct = TRUE,
-                striped     = TRUE,
-                title       = " "
-              )
+            href    = "https://github.com/Breeding-Insight/AlloMate",
+            target  = "_blank",
+            class   = "btn btn-info",
+            style   = "width: 100%; background-color: #17a2b8; color: white; border: none; padding: 10px; border-radius: 5px; text-align: center;",
+            shiny::tagList(shiny::icon("github"), " Visit GitHub repository")
+          ),
+          
+          shiny::hr(),
+          
+          # Help button
+          shiny::div(
+            style = "text-align: center; margin-top: 5px;",
+            shiny::actionButton(
+              ns("help_btn"),
+              shiny::tagList(shiny::icon("circle-question"), "Help"),
+              style = "background-color: #FFD700; color: #000000; border: none; padding: 8px 16px; border-radius: 5px;"
             )
+          )
+          
+        )  # closes box
+      ),  # closes column(width = 3)
+      
+      # Column 2: Results
+      shiny::column(
+        width = 6,
+        bs4Dash::box(
+          title       = "AlloMate Results",
+          status      = "info",
+          solidHeader = FALSE,
+          width       = 12,
+          height      = 750,
+          maximizable = TRUE,
+          bs4Dash::tabsetPanel(
+            id   = ns("main_tabs"),
+            type = "tabs",
+            
+            shiny::tabPanel(
+              "Instructions",
+              shiny::fluidRow(
+                shiny::column(12, shiny::wellPanel(shiny::HTML('
+                  <ul>
+                    <li>This tool performs mate selection and optimum contribution selection (OCS) for breeding programs.</li>
+                    <li><strong>Step 1:</strong> Upload your <strong>candidate list</strong> (.csv or .txt) with columns: <code>id</code>, <code>sex</code>.</li>
+                    <li><strong>Step 2:</strong> Upload your <strong>pedigree file</strong> (.txt) with columns: <code>id</code>, <code>male_parent</code>, <code>female_parent</code>.</li>
+                    <li><strong>Step 3:</strong> Optionally adjust the <strong>kinship threshold</strong> to restrict inbred crosses.</li>
+                    <li><strong>Step 4:</strong> Upload <strong>trait EBV files</strong> and assign weights. Weights must sum to 1.</li>
+                    <li><strong>Step 5:</strong> Configure OCS parameters and click <strong>Run OCS</strong>.</li>
+                    <li>Results are shown in the <strong>Kinship and EBV</strong> and <strong>Optimum Contribution Selection</strong> tabs.</li>
+                    <li>Use <strong>Export All Results</strong> to download a zip of all output tables.</li>
+                  </ul>
+                ')))
+              ),
+              style = "overflow-y: auto; height: 640px;"
+            ),
+            
+            shiny::tabPanel(
+              "Kinship and EBV",
+              shiny::br(),
+              shiny::verbatimTextOutput(ns("message1")),
+              shiny::uiOutput(ns("candidate_ebv_status")),
+              shiny::uiOutput(ns("ebv_upload_prompt")),
+              shiny::uiOutput(ns("message2")),
+              DT::DTOutput(ns("quadrants_table")),
+              DT::DTOutput(ns("matrix")),
+              style = "overflow-y: auto; height: 640px;"
+            ),
+            
+            shiny::tabPanel(
+              "Optimum Contribution Selection",
+              shiny::br(),
+              shiny::div(
+                id    = "ocs_container",
+                style = "position: relative;",
+                shiny::div(
+                  id    = "ocs_loading",
+                  style = "display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255,255,255,0.8); z-index: 9999;",
+                  shiny::div(
+                    style = "position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%);",
+                    shiny::div(class = "ocs-spinner")
+                  )
+                ),
+                DT::DTOutput(ns("ocs_candidate_table")),
+                shiny::uiOutput(ns("ocs_solver_note")),
+                shiny::br(),
+                DT::DTOutput(ns("ocs_mating_table"))
+              ),
+              style = "overflow-y: auto; height: 640px;"
+            )
+            
+          )
+        )  # closes box
+      ),  # closes column(width = 6)
+      
+      # Column 3: Status + File Status + Guide
+      shiny::column(
+        width = 3,
+        
+        # Status / progress
+        bs4Dash::box(
+          title       = "Status",
+          width       = 12,
+          collapsible = TRUE,
+          status      = "info",
+          shinyWidgets::progressBar(
+            id          = ns("pb_allomate"),
+            value       = 0,
+            status      = "info",
+            display_pct = TRUE,
+            striped     = TRUE,
+            title       = " "
           )
         ),
-        shiny::br(),
-        bs4Dash::tabsetPanel(
-          id   = ns("main_tabs"),
-          type = "tabs",
-          shiny::tabPanel(
-            "Kinship and EBV",
-            shiny::br(),
-            shiny::verbatimTextOutput(ns("message1")),
-            shiny::uiOutput(ns("candidate_ebv_status")),
-            shiny::uiOutput(ns("ebv_upload_prompt")),
-            shiny::uiOutput(ns("message2")),
-            DT::DTOutput(ns("quadrants_table")),
-            DT::DTOutput(ns("matrix"))
-          ),
-          shiny::tabPanel(
-            "Optimum Contribution Selection",
-            shiny::br(),
-            shiny::div(
-              id    = "ocs_container",
-              style = "position: relative;",
-              shiny::div(
-                id    = "ocs_loading",
-                style = "display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255,255,255,0.8); z-index: 9999;",
-                shiny::div(
-                  style = "position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%);",
-                  shiny::div(class = "ocs-spinner")
-                )
-              ),
-              DT::DTOutput(ns("ocs_candidate_table")),
-              shiny::uiOutput(ns("ocs_solver_note")),
-              shiny::br(),
-              DT::DTOutput(ns("ocs_mating_table"))
-            )
-          )
+        
+        # Getting started / step guide
+        bs4Dash::box(
+          title       = "Getting Started",
+          width       = 12,
+          collapsible = TRUE,
+          collapsed   = FALSE,
+          status      = "info",
+          solidHeader = TRUE,
+          shiny::uiOutput(ns("dynamic_guide"))
+        ),
+        
+        # File status
+        bs4Dash::box(
+          title       = "File Status",
+          width       = 12,
+          collapsible = TRUE,
+          collapsed   = FALSE,
+          status      = "info",
+          solidHeader = TRUE,
+          shiny::htmlOutput(ns("file_status_display"))
         )
-      )
-    )
-  )
+        
+      )  # closes column(width = 3)
+      
+    )  # closes fluidRow
+  )    # closes tagList
 }
 
 #' AlloMate analysis module server
@@ -901,7 +973,7 @@ mod_allomate_server <- function(id, parent_session) {
           shiny::showNotification(paste0(warning_msg, ")."), type = "warning", duration = 8)
         }
         if (length(ebv_only_ids) > 0) {
-          shiny::showNotification("OCS: EBV records without candidates were ignored.",
+          shiny::showNotification("OCS: IDs with EBVss but not in the candidate list were ignored.",
                                   type = "warning", duration = 8)
         }
         candidates_filtered <- candidates_joined %>% dplyr::filter(!is.na(index_val))
