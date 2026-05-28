@@ -973,7 +973,7 @@ mod_allomate_server <- function(id, parent_session) {
           shiny::showNotification(paste0(warning_msg, ")."), type = "warning", duration = 8)
         }
         if (length(ebv_only_ids) > 0) {
-          shiny::showNotification("OCS: Candidates without ebv records were ignored.",
+          shiny::showNotification("OCS: IDs with EBVss but not in the candidate list were ignored.",
                                   type = "warning", duration = 8)
         }
         candidates_filtered <- candidates_joined %>% dplyr::filter(!is.na(index_val))
