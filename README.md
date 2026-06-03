@@ -79,7 +79,7 @@ if (!requireNamespace("remotes", quietly = TRUE)) {
 remotes::install_github("Breeding-Insight/AlloMate")
 ```
 ### Run AlloMate
-```{r}
+```r
 AlloMate::run_app()
 ```
 ---
