@@ -71,7 +71,7 @@ AlloMate uses a golem application structure, allowing it to be installed like
 a standard R package.
 
 ### Install from GitHub
-```{r}
+```r
 if (!requireNamespace("remotes", quietly = TRUE)) {
   install.packages("remotes")
 }
