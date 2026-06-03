@@ -5,8 +5,8 @@
 #'
 #' @noRd
 app_server <- function(input, output, session) {
-  mod_home_server("home_1", parent_session = session)
-  mod_allomate_server("allomate_1", parent_session = session)
-  mod_help_server("help_1", parent_session = session)
+   shiny::callModule(mod_Home_server, "Home_1", parent_session = session)
+  mod_ped_cleaner_server("ped_cleaner_1", parent_session = session)
+  mod_allomate_server("allomate_1",       parent_session = session)
+  mod_help_server("help_1",               parent_session = session)
 }
-

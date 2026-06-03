@@ -3,13 +3,13 @@
 
 #' Fallback fixParents
 #' @param id vector of IDs
-#' @param sire vector of sires
-#' @param dam vector of dams
+#' @param male_parent vector of male parents
+#' @param female_parent vector of female parents
 #' @param sex vector of sex values
 #' @param missid missing id value
 #' @return data.frame
-fallback_fixParents <- function(id, sire, dam, sex, missid = "0") {
-  data.frame(id = id, dadid = sire, momid = dam, sex = sex, stringsAsFactors = FALSE)
+fallback_fixParents <- function(id, male_parent, female_parent, sex, missid = "0") {
+  data.frame(id = id, dadid = male_parent, momid = female_parent, sex = sex, stringsAsFactors = FALSE)
 }
 
 #' Fallback pedigree
@@ -47,11 +47,11 @@ read_candidates <- function(file) {
   if (length(missing_cols) > 0) {
     stop(sprintf("CANDIDATES: missing required column(s): %s", paste(missing_cols, collapse = ", ")))
   }
-  df$id <- as.character(df$id)
+  df$id  <- as.character(df$id)
   df$sex <- toupper(as.character(df$sex))
   list(
     candidates = df,
-    males = filter(df, sex == "M") %>% pull(id),
+    males   = filter(df, sex == "M") %>% pull(id),
     females = filter(df, sex == "F") %>% pull(id)
   )
 }
@@ -64,27 +64,81 @@ read_candidates <- function(file) {
 #' @return cleaned pedigree
 clean_pedigree <- function(ped, return_stats = FALSE) {
   kinship2_available <- requireNamespace("kinship2", quietly = TRUE)
-
-  ped_chr <- ped %>% mutate(across(c(id, sire, dam), as.character))
-  is_missing_parent <- function(x) { is.na(x) | x == "" | x == "0" }
-  total_records <- nrow(ped_chr)
-  unknown_parent_count <- sum(is_missing_parent(ped_chr$sire) | is_missing_parent(ped_chr$dam), na.rm = TRUE)
-  circular_rows <- (ped_chr$id == ped_chr$sire) | (ped_chr$id == ped_chr$dam)
+  
+  # Fail fast with a clear message if required columns are missing
+  required     <- c("id", "male_parent", "female_parent")
+  missing_cols <- setdiff(required, tolower(names(ped)))
+  if (length(missing_cols) > 0) {
+    stop(sprintf(
+      "PEDIGREE: missing required column(s): %s. Expected columns: id, male_parent, female_parent.",
+      paste(missing_cols, collapse = ", ")
+    ))
+  }
+  
+  names(ped) <- tolower(names(ped))
+  
+  # Keep as character throughout cleaning — only factorize when needed
+  ped_chr <- ped %>% mutate(across(c(id, male_parent, female_parent), as.character))
+  
+  is_missing_parent    <- function(x) { is.na(x) | x == "" | x == "0" }
+  total_records        <- nrow(ped_chr)
+  unknown_parent_count <- sum(
+    is_missing_parent(ped_chr$male_parent) | is_missing_parent(ped_chr$female_parent),
+    na.rm = TRUE
+  )
+  circular_rows            <- (ped_chr$id == ped_chr$male_parent) | (ped_chr$id == ped_chr$female_parent)
   circular_reference_count <- sum(circular_rows, na.rm = TRUE)
-  duplicates_removed <- sum(duplicated(ped_chr$id))
-  final_ped <- ped_chr %>% mutate(across(c(id, sire, dam), as.factor)) %>% mutate(sex = case_when(id %in% sire ~ 0, id %in% dam ~ 1, TRUE ~ 2)) %>% {
-    messy_parents <- setdiff(intersect(.$sire, .$dam), 0) %>% as.data.frame() %>% rename(id = 1)
-    parents_fixed <- .
-    parents_fixed$sire[parents_fixed$sire %in% messy_parents$id] <- 0
-    parents_fixed$dam[parents_fixed$dam %in% messy_parents$id] <- 0
-    parents_fixed
-  } %>% { .[!duplicated(.$id), ] } %>% { circdep <- .; circdep$id <- as.character(circdep$id); circdep$sire <- as.character(circdep$sire); circdep$dam <- as.character(circdep$dam); circdep <- circdep[circdep$id == circdep$sire | circdep$id == circdep$dam, ]; .[!.$id %in% circdep$id, ] } %>%
-    with(., if (exists("kinship2_available") && kinship2_available) kinship2::fixParents(id, sire, dam, sex, missid = "0") else fallback_fixParents(id, sire, dam, sex, missid = "0")) %>%
-    with(., if (exists("kinship2_available") && kinship2_available) kinship2::pedigree(id, dadid, momid, sex, missid = "0") else fallback_pedigree(id, dadid, momid, sex, missid = "0"))
+  duplicates_removed       <- sum(duplicated(ped_chr$id))
+  
+  # Fix messy parents while still in character form to avoid factor NA assignment
+  messy_parents <- setdiff(
+    intersect(ped_chr$male_parent, ped_chr$female_parent),
+    c("0", NA, "")
+  )
+  ped_chr$male_parent[ped_chr$male_parent %in% messy_parents]     <- "0"
+  ped_chr$female_parent[ped_chr$female_parent %in% messy_parents] <- "0"
+  
+  # Remove duplicates
+  ped_chr <- ped_chr[!duplicated(ped_chr$id), ]
+  
+  # Remove circular dependencies
+  circdep <- ped_chr[
+    ped_chr$id == ped_chr$male_parent | ped_chr$id == ped_chr$female_parent,
+  ]
+  ped_chr <- ped_chr[!ped_chr$id %in% circdep$id, ]
+  
+  # Now factorize and assign sex
+  ped_fct <- ped_chr %>%
+    mutate(across(c(id, male_parent, female_parent), as.factor)) %>%
+    mutate(sex = case_when(
+      id %in% male_parent   ~ 0,
+      id %in% female_parent ~ 1,
+      TRUE                  ~ 2
+    ))
+  
+  final_ped <- with(ped_fct,
+                    if (kinship2_available)
+                      kinship2::fixParents(id, male_parent, female_parent, sex, missid = "0")
+                    else
+                      fallback_fixParents(id, male_parent, female_parent, sex, missid = "0")
+  ) %>%
+    with(.,
+         if (kinship2_available)
+           kinship2::pedigree(id, dadid, momid, sex, missid = "0")
+         else
+           fallback_pedigree(id, dadid, momid, sex, missid = "0")
+    )
+  
   if (return_stats) {
-    stats <- list(records_loaded = total_records, unknown_parent_count = unknown_parent_count, circular_reference_count = circular_reference_count, duplicates_removed = duplicates_removed)
+    stats <- list(
+      records_loaded           = total_records,
+      unknown_parent_count     = unknown_parent_count,
+      circular_reference_count = circular_reference_count,
+      duplicates_removed       = duplicates_removed
+    )
     return(list(pedigree = final_ped, stats = stats))
   }
+  
   return(final_ped)
 }
 
@@ -97,11 +151,17 @@ clean_pedigree <- function(ped, return_stats = FALSE) {
 #' @return list
 compute_kinship_matrix <- function(ped, males, females) {
   kinship2_available <- requireNamespace("kinship2", quietly = TRUE)
-
   kinship_matrix <- if (exists("kinship2_available") && kinship2_available) kinship2::kinship(ped) else fallback_kinship(ped)
-  kin_mat_sel <- kinship_matrix[males, females]
-  kin_quads <- tibble(Data = "Kinship", Q25 = quantile(kin_mat_sel, 0.25), Q50 = quantile(kin_mat_sel, 0.50), Q75 = quantile(kin_mat_sel, 0.75), Q100 = quantile(kin_mat_sel, 1.00)) %>% column_to_rownames("Data")
-  kinship_results <- as_tibble(kin_mat_sel, rownames = "Male") %>% pivot_longer(-Male, names_to = "Female", values_to = "Kinship")
+  kin_mat_sel    <- kinship_matrix[males, females]
+  kin_quads      <- tibble(
+    Data = "Kinship",
+    Q25  = quantile(kin_mat_sel, 0.25),
+    Q50  = quantile(kin_mat_sel, 0.50),
+    Q75  = quantile(kin_mat_sel, 0.75),
+    Q100 = quantile(kin_mat_sel, 1.00)
+  ) %>% column_to_rownames("Data")
+  kinship_results <- as_tibble(kin_mat_sel, rownames = "Male") %>%
+    pivot_longer(-Male, names_to = "Female", values_to = "Kinship")
   list(results = kinship_results, quads = kin_quads, matrix = kin_mat_sel)
 }
 
@@ -117,22 +177,23 @@ compute_kinship_matrix <- function(ped, males, females) {
 process_ebvs <- function(trait_counter, input, prefix = "") {
   ebv_inputs <- list()
   for (i in seq_len(trait_counter)) {
-    file_i <- input[[paste0(prefix, "trait_file_", i)]]
+    file_i   <- input[[paste0(prefix, "trait_file_",   i)]]
     weight_i <- input[[paste0(prefix, "trait_weight_", i)]]
     if (!is.null(file_i) && !is.null(weight_i)) {
       df_raw <- read_table(file_i$datapath)
-      if (!"ID" %in% names(df_raw)) names(df_raw)[1] <- "ID"
-      if (!"EBV" %in% names(df_raw)) names[df_raw][2] <- "EBV"
+      if (!"ID"  %in% names(df_raw)) names(df_raw)[1] <- "ID"
+      if (!"EBV" %in% names(df_raw)) names(df_raw)[2] <- "EBV"
       df_raw$EBV <- as.numeric(df_raw$EBV)
       ebv_inputs <- append(ebv_inputs, list(select(df_raw, ID, EBV), weight_i))
     }
   }
   if (length(ebv_inputs) >= 2 && length(ebv_inputs) %% 2 == 0) {
-    rel_weights <- unlist(ebv_inputs[seq(2, length(ebv_inputs), by = 2)])
+    rel_weights  <- unlist(ebv_inputs[seq(2, length(ebv_inputs), by = 2)])
     weight_total <- sum(rel_weights)
-    ebv_dfs <- ebv_inputs[seq(1, length(ebv_inputs), by = 2)]
-    ebv_dfs <- imap(ebv_dfs, ~ rename(.x, !!paste0("EBV.", .y) := EBV))
-    joint_ebvs <- reduce(ebv_dfs, full_join, by = "ID") %>% mutate(across(starts_with("EBV."), ~ replace_na(.x, 0)))
+    ebv_dfs      <- ebv_inputs[seq(1, length(ebv_inputs), by = 2)]
+    ebv_dfs      <- imap(ebv_dfs, ~ rename(.x, !!paste0("EBV.", .y) := EBV))
+    joint_ebvs   <- reduce(ebv_dfs, full_join, by = "ID") %>%
+      mutate(across(starts_with("EBV."), ~ replace_na(.x, 0)))
     list(joint_ebvs = joint_ebvs, rel_weights = rel_weights, weight_total = weight_total)
   } else NULL
 }
@@ -156,5 +217,54 @@ format_id_list <- function(ids, limit = 4) {
   ids <- unique(ids)
   ids <- ids[!is.na(ids) & ids != ""]
   if (length(ids) == 0) return("")
-  if (length(ids) <= limit) paste(ids, collapse = ", ") else paste(c(ids[seq_len(limit)], "(5 or more)"), collapse = ", ")
+  if (length(ids) <= limit) {
+    paste(ids, collapse = ", ")
+  } else {
+    paste(c(ids[seq_len(limit)], "(5 or more)"), collapse = ", ")
+  }
+}
+
+#' Build a Bootstrap collapsible panel card
+#'
+#' A shared utility used by help content functions and module servers to render
+#' collapsible sub-panels in the UI.
+#'
+#' @param panel_id A unique string used as the HTML element id for the collapse target.
+#' @param icon_name A Font Awesome icon name passed to [shiny::icon()].
+#' @param label A string label displayed in the panel header button.
+#' @param body_content A shiny tag or [shiny::tagList()] rendered inside the panel body.
+#'
+#' @return A [shiny::tags$div()] structure representing a Bootstrap card with a
+#'   collapsible body.
+#'
+#' @importFrom shiny tags icon tagList
+#'
+#' @noRd
+make_collapse_panel <- function(panel_id, icon_name, label, body_content) {
+  shiny::tags$div(
+    class = "card mb-1",
+    style = "border: 1px solid #dee2e6; border-radius: 4px;",
+    shiny::tags$div(
+      class = "card-header p-0",
+      style = "background-color: #f8f9fa;",
+      shiny::tags$button(
+        class           = "btn btn-link btn-sm w-100 text-left d-flex align-items-center",
+        style           = "color: #343a40; text-decoration: none; font-size: 13px; padding: 8px 12px; gap: 6px;",
+        `data-toggle`   = "collapse",
+        `data-target`   = paste0("#", panel_id),
+        `aria-expanded` = "false",
+        shiny::icon(icon_name),
+        shiny::tags$span(label)
+      )
+    ),
+    shiny::tags$div(
+      id    = panel_id,
+      class = "collapse",
+      shiny::tags$div(
+        class = "card-body",
+        style = "padding: 12px 14px; font-size: 13px;",
+        body_content
+      )
+    )
+  )
 }

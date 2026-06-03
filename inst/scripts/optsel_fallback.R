@@ -610,7 +610,7 @@ server <- function(input, output, session) {
         results$Mating %>%
           mutate(Kinship = round(Kin, 4)) %>%
           select(Sire, Dam, Kinship, n) %>%
-          rename(`# Matings` = n)
+          rename(`# Offspring` = n)
       }, options = list(pageLength = 10, dom = 'frtip'))
       
     }, error = function(e) {
@@ -654,7 +654,7 @@ server <- function(input, output, session) {
       mating_df <- results$Mating %>%
         mutate(Kinship = round(Kin, 4)) %>%
         select(Sire, Dam, Kinship, n) %>%
-        rename(`# Matings` = n)
+        rename(`# Offspring` = n)
 
       if (use_openxlsx) {
         wb <- openxlsx::createWorkbook()
