@@ -6,6 +6,7 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![GitHub issues](https://img.shields.io/github/issues/Breeding-Insight/AlloMate)](https://github.com/Breeding-Insight/AlloMate/issues)
 [![GitHub pull requests](https://img.shields.io/github/issues-pr/Breeding-Insight/AlloMate)](https://github.com/Breeding-Insight/AlloMate/pulls)
+[![GitHub Release](https://img.shields.io/github/v/release/Breeding-Insight/AlloMate?include_prereleases)](https://github.com/Breeding-Insight/AlloMate/releases/latest)
 
 AlloMate is a **Shiny web application** developed by the Breeding Insight team to support **genetic mate allocation and breeding optimization**. The app integrates pedigree-based kinship, estimated breeding values (EBVs), and **Optimum Contribution Selection (OCS)** to help breeding programs balance genetic gain while controlling inbreeding.
 
