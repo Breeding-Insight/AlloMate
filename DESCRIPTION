@@ -1,6 +1,6 @@
 Package: AlloMate
 Title: Genetic Mate Allocation and Breeding Optimization Shiny App
-Version: 2.1.0
+Version: 2.2.0
 Authors@R: c(
   person("Josue",                 "Chinchilla-Vargas",
          role = c("aut", "cre"),
