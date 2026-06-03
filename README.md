@@ -25,7 +25,6 @@ Modern breeding programs must optimize selection decisions while managing inbree
 and long-term genetic diversity. AlloMate provides an interactive and reproducible
 framework for:
 
-- Validating and cleaning pedigree records prior to analysis
 - Evaluating genetic relatedness among breeding candidates
 - Combining multiple EBV traits using user-defined weights
 - Optimizing individual contributions via Optimum Contribution Selection
@@ -37,14 +36,6 @@ of breeding program designs.
 ---
 
 ## Key Features
-
-### Pedigree Cleaning
-
-- Detection of structural pedigree errors (e.g., missing parents, duplicate IDs,
-  sex conflicts)
-- Flagging of individuals with inconsistent or incomplete pedigree records
-- Interactive review and resolution of pedigree issues before downstream analysis
-- Summary reports of identified issues and applied corrections
 
 ### Breeding and Optimization
 
@@ -109,22 +100,18 @@ Optional:
    - Pedigree file (id, male_parent, female_parent)
    - EBV files for one or more traits
 
-2. Run pedigree cleaning:
-   - Review flagged structural errors and inconsistencies
-   - Apply or export corrections before proceeding with analysis
-
-3. Configure analysis parameters:
+2. Configure analysis parameters:
    - Trait weights (must sum to 1)
    - Kinship thresholds
    - OCS constraints
 
-4. Review outputs:
+3. Review outputs:
    - Kinship matrices and summaries
    - Combined EBV scores
    - Optimal contributions and mating plans
 
-5. Export results:
-   - Download Excel reports containing all outputs and diagnostics
+4. Export results:
+   - Download reports containing all outputs and diagnostics
 
 ---
 
