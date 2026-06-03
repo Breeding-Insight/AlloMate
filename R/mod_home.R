@@ -30,10 +30,7 @@ mod_Home_ui <- function(id){
                               </div>",
                                           paste0(
                                             "<p>AlloMate helps breeding programs allocate mates and optimize selection decisions by combining pedigree-based kinship, weighted EBVs, and Optimum Contribution Selection (OCS).</p>",
-                                            "<ul>",
-                                            "  <li><b>Pedigree Cleaning:</b> clean your pedigree of common errors to ensure accuracy of estimated relationships between individuals.</li>",
-                                            "  <li><b>Mate Allocation:</b> Use either manual or Optimal Contribution Selection frameworks to assign matings for your breeding program.</li>",
-                                            "</ul>"
+                                            "<ul>"
                                           )
                                         ),
                                         style = "overflow-y: auto; height: 500px"

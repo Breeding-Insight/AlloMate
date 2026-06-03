@@ -74,12 +74,6 @@ mod_help_server <- function(id, parent_session = NULL) {
           icon_name    = "bullseye",
           label        = "Mate Allocation",
           body_content = help_content_allomate(collapse_fn = make_collapse_panel, id_prefix = "page")
-        ),
-        make_top_panel(
-          panel_id     = "ped_cleaner",
-          icon_name    = "diagram-project",
-          label        = "Pedigree Cleaner",
-          body_content = help_content_ped_cleaner(collapse_fn = make_collapse_panel, id_prefix = "page")
         )
       )
     })
