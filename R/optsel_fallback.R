@@ -11,7 +11,7 @@
 #' 
 #' @return Object of class 'custom_candes'
 custom_candes <- function(phen, pKin, quiet = FALSE) {
-  # Validate inputs with Shadow Broker precision
+  # Validate inputs
   if(!all(c("Indiv", "Sex", "BV", "isCandidate") %in% names(phen))) {
     stop("❌ phen must contain columns: Indiv, Sex, BV, isCandidate")
   }
@@ -23,7 +23,7 @@ custom_candes <- function(phen, pKin, quiet = FALSE) {
   mean_bv <- mean(candidates$BV, na.rm = TRUE)
   var_bv <- var(candidates$BV, na.rm = TRUE)
   
-  # Structure the data as the Shadow Broker would organize her archives
+  # Structure the data
   cand_obj <- list(
     phen = phen,
     candidates = candidates,

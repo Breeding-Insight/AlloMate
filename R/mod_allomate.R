@@ -583,7 +583,8 @@ mod_allomate_server <- function(id, parent_session) {
         value = 40, status = "info", title = "Processing pedigree..."
       )
       tryCatch({
-        raw_ped <- readr::read_table(input$pedigree_file$datapath)
+        raw_ped <- read_uploaded_table(input$pedigree_file, file_type = "PEDIGREE")
+        names(raw_ped) <- tolower(names(raw_ped))
         required_cols <- c("id", "male_parent", "female_parent")
         missing_cols  <- setdiff(required_cols, colnames(raw_ped))
         if (length(missing_cols) > 0) {
@@ -857,8 +858,9 @@ mod_allomate_server <- function(id, parent_session) {
         value = 82, status = "info", title = "Reading input files..."
       )
       tryCatch({
-        ped_data   <- read.table(input$pedigree_file$datapath, header = TRUE, stringsAsFactors = FALSE)
-        candidates <- read.table(input$candidate_file$datapath, header = TRUE, stringsAsFactors = FALSE)
+        ped_data <- read_uploaded_table(input$pedigree_file, file_type = "PEDIGREE")
+        names(ped_data) <- tolower(names(ped_data))
+        candidates <- candidates_data()$candidates
         required_cols <- c("id", "male_parent", "female_parent")
         missing_cols  <- setdiff(required_cols, colnames(ped_data))
         if (length(missing_cols) > 0) {
