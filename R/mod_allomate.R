@@ -5,87 +5,88 @@
 #' @noRd
 mod_allomate_ui <- function(id) {
   ns <- shiny::NS(id)
+  
   # Override: Chromium download attribute bug fix
   downloadButton <- function(...) {
     tag <- shiny::downloadButton(...)
     tag$attribs$download <- NULL
     tag
   }
+  
   shiny::tagList(
-    shiny::sidebarLayout(
-      shiny::sidebarPanel(
-        shiny::div(
-          style = "background-color: #ffffff; border: 2px solid #444444; padding: 15px; margin-bottom: 20px; border-radius: 8px;",
-          shiny::h4(
-            shiny::tagList(shiny::icon("gear"), "Getting Started"),
-            style = "color: #000000; margin-bottom: 15px; border-bottom: 1px solid black; padding-bottom: 8px;"
-          ),
-          shiny::htmlOutput(ns("dynamic_guide")),
-          shiny::div(
-            style = "text-align: center; margin-top: 15px; padding-top: 10px; border-top: 1px solid #dee2e6;",
-            shiny::actionButton(
-              ns("help_btn"),
-              shiny::tagList(shiny::icon("circle-question"), "Help"),
-              style = "background-color: #FFD700; color: #000000; border:none; padding: 8px 16px; border-radius: 5px;"
-            )
-          )
-        ),
-        shiny::wellPanel(
-          style = "background-color: #ffffff; border: 2px solid #444444; padding: 15px; margin-bottom: 20px; border-radius: 8px;",
-          shiny::h4(
-            shiny::tagList(shiny::icon("sitemap"), "Core Data Inputs"),
-            style = "color: #000000; margin-bottom: 15px; border-bottom: 1px solid #000000; padding-bottom: 8px;"
-          ),
+    shinyjs::useShinyjs(),
+    shiny::fluidRow(
+      
+      # Column 1: Inputs
+      shiny::column(
+        width = 3,
+        bs4Dash::box(
+          title       = "Inputs",
+          width       = 12,
+          collapsible = TRUE,
+          collapsed   = FALSE,
+          status      = "info",
+          solidHeader = TRUE,
           shiny::p(
-            "These inputs are used by both Index Generation and OCS calculations:",
+            "Upload required files and configure parameters below.",
             style = "color: #6c757d; font-size: 12px; margin-bottom: 15px;"
           ),
-          shiny::h5("Estimate progeny genetic merit"),
+          
+          # --- Core Data ---
+          shiny::h5(
+            shiny::tagList(shiny::icon("sitemap"), " Core Data Inputs"),
+            style = "border-bottom: 1px solid #dee2e6; padding-bottom: 6px; margin-bottom: 10px;"
+          ),
+          shiny::p(
+            "Used by both Index Generation and OCS calculations:",
+            style = "color: #6c757d; font-size: 12px; margin-bottom: 10px;"
+          ),
+          shiny::h6("Estimate progeny genetic merit"),
           shiny::fileInput(ns("candidate_file"), "Upload list of candidates", accept = c(".csv", ".txt")),
-          shiny::h5("Calculate kinship matrix"),
+          shiny::h6("Calculate kinship matrix"),
           shiny::fileInput(ns("pedigree_file"), "Upload pedigree file", accept = ".txt"),
           shiny::uiOutput(ns("pedigree_status_display")),
-          shiny::h5("Set kinship threshold"),
+          shiny::h6("Set kinship threshold"),
           shiny::numericInput(
             ns("thresh"),
             "Max kinship allowed between mates:",
             value = 1, min = 0, max = 1, step = 0.1
-          )
-        ),
-        shiny::wellPanel(
-          style = "background-color: #ffffff; border: 2px solid #444444; padding: 15px; margin-bottom: 20px; border-radius: 8px;",
-          shiny::h4(
+          ),
+          shiny::hr(),
+          
+          # --- Weighted EBVs ---
+          shiny::h5(
             shiny::tagList(shiny::icon("balance-scale"), " Weighted EBVs"),
-            style = "color: #000000; margin-bottom: 15px; border-bottom: 1px solid #000000; padding-bottom: 8px;"
+            style = "border-bottom: 1px solid #dee2e6; padding-bottom: 6px; margin-bottom: 10px;"
           ),
           shiny::p(
             "Define traits and their relative importance for breeding decisions:",
-            style = "color: #6c757d; font-size: 12px; margin-bottom: 15px;"
+            style = "color: #6c757d; font-size: 12px; margin-bottom: 10px;"
           ),
-          shiny::h5("Traits (EBVs and weights)"),
+          shiny::h6("Traits (EBVs and weights)"),
           shiny::uiOutput(ns("trait_inputs")),
           shiny::fluidRow(
-            shiny::column(6, shiny::actionButton(ns("add_trait"), "+ Add trait")),
+            shiny::column(6, shiny::actionButton(ns("add_trait"),    "+ Add trait")),
             shiny::column(6, shiny::actionButton(ns("remove_trait"), "- Remove trait"))
           ),
           shiny::p(
             "Note: Adding or removing traits will require re-uploading files.",
             style = "color: #6c757d; font-size: 11px; font-style: italic; margin-top: 8px;"
-          )
-        ),
-        shiny::wellPanel(
-          style = "background-color: #ffffff; border: 2px solid #444444; padding: 15px; margin-bottom: 20px; border-radius: 8px;",
-          shiny::h4(
+          ),
+          shiny::hr(),
+          
+          # --- OCS ---
+          shiny::h5(
             shiny::tagList(shiny::icon("bullseye"), " Optimum Contribution Selection"),
-            style = "color: #000000; margin-bottom: 15px; border-bottom: 1px solid #000000; padding-bottom: 8px;"
+            style = "border-bottom: 1px solid #dee2e6; padding-bottom: 6px; margin-bottom: 10px;"
           ),
           shiny::p(
             "Configure breeding objectives and constraints:",
-            style = "color: #6c757d; font-size: 12px; margin-bottom: 15px;"
+            style = "color: #6c757d; font-size: 12px; margin-bottom: 10px;"
           ),
           shiny::verbatimTextOutput(ns("package_status_text")),
           shiny::div(style = "display:none;", shiny::textOutput(ns("ocs_checkbox_mode"))),
-          shiny::h5("Breeding Objectives"),
+          shiny::h6("Breeding Objectives"),
           shiny::numericInput(
             ns("inbreeding_rate"), "Desired Inbreeding Rate",
             value = 0.05, min = 0.01, max = 0.2, step = 0.01
@@ -112,100 +113,146 @@ mod_allomate_ui <- function(id) {
               value = isTRUE(getOption("allomate.force_qp_greedy", FALSE))
             )
           ),
-          shiny::actionButton(
-            ns("run_ocs_btn"), "Run OCS",
-            style = "margin-top: 15px; width: 100%; background-color: #28a745; color: white; border: none; padding: 10px; border-radius: 5px;"
-          )
-        ),
-        shiny::wellPanel(
-          style = "background-color: #ffffff; border: 2px solid #444444; padding: 15px; margin-bottom: 20px; border-radius: 8px;",
-          shiny::h4(
-            shiny::tagList(shiny::icon("bar-chart"), "Export Results"),
-            style = "color: #000000; margin-bottom: 15px; border-bottom: 1px solid #c3e6cb; padding-bottom: 8px;"
+          shiny::actionButton(ns("run_ocs_btn"), "Run OCS"),
+          shiny::hr(),
+          
+          # --- Export ---
+          shiny::h5(
+            shiny::tagList(shiny::icon("bar-chart"), " Export Results"),
+            style = "border-bottom: 1px solid #dee2e6; padding-bottom: 6px; margin-bottom: 10px;"
           ),
           shiny::p(
             "Download all results in a single zip file:",
-            style = "color: #6c757d; font-size: 12px; margin-bottom: 15px;"
+            style = "color: #6c757d; font-size: 12px; margin-bottom: 10px;"
           ),
-          downloadButton(
-            ns("download_all_results"), "Export All Results",
-            style = "width: 100%; background-color: #28a745; color: white; border: none; padding: 10px; border-radius: 5px; margin-bottom: 10px;"
+          shinyjs::disabled(
+            downloadButton(ns("download_all_results"), "Download Results")
           ),
+          shiny::hr(),
+          
+          # Help button
           shiny::div(
-            style = "background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 12px; margin-bottom: 10px; border-radius: 5px;",
-            shiny::h5(
-              shiny::tagList(shiny::icon("file"), "File Status"),
-              style = "color: #495057; margin-top: 0; margin-bottom: 10px; font-size: 14px;"
+            style = "text-align: center; margin-top: 5px;",
+            shiny::actionButton(
+              ns("help_btn"),
+              shiny::tagList(shiny::icon("circle-question"), "Help"),
+              style = "background-color: #FFD700; color: #000000; border: none; padding: 8px 16px; border-radius: 5px;"
+            )
+          )
+        ) # closes box
+      ), # closes column(width = 3)
+      
+      # Column 2: Results
+      shiny::column(
+        width = 6,
+        bs4Dash::box(
+          title       = "AlloMate Results",
+          status      = "info",
+          solidHeader = FALSE,
+          width       = 12,
+          height      = 750,
+          maximizable = TRUE,
+          bs4Dash::tabsetPanel(
+            id   = ns("main_tabs"),
+            type = "tabs",
+            shiny::tabPanel(
+              "Instructions",
+              shiny::fluidRow(
+                shiny::column(12, shiny::wellPanel(shiny::HTML('
+                  <ul>
+                    <li>This tool performs mate selection and optimum contribution selection (OCS) for breeding programs.</li>
+                    <li><strong>Step 1:</strong> Upload your <strong>candidate list</strong> (.csv or .txt) with columns: <code>id</code>, <code>sex</code>.</li>
+                    <li><strong>Step 2:</strong> Upload your <strong>pedigree file</strong> (.txt) with columns: <code>id</code>, <code>male_parent</code>, <code>female_parent</code>.</li>
+                    <li><strong>Step 3:</strong> Optionally adjust the <strong>kinship threshold</strong> to restrict inbred crosses.</li>
+                    <li><strong>Step 4:</strong> Upload <strong>trait EBV files</strong> and assign weights. Weights must sum to 1.</li>
+                    <li><strong>Step 5:</strong> Configure OCS parameters and click <strong>Run OCS</strong>.</li>
+                    <li>Results are shown in the <strong>Kinship and EBV</strong> and <strong>Optimum Contribution Selection</strong> tabs.</li>
+                    <li>Use <strong>Download Results</strong> to download a zip of all output tables.</li>
+                  </ul>
+                ')))
+              ),
+              style = "overflow-y: auto; height: 640px;"
             ),
-            shiny::htmlOutput(ns("file_status_display"))
-          ),
-          shiny::tags$a(
-            href       = "https://github.com/Breeding-Insight/AlloMate",
-            target     = "_blank",
-            class      = "btn btn-info",
-            style      = "width: 100%; background-color: #17a2b8; color: white; border: none; padding: 10px; border-radius: 5px; text-align: center;",
-            shiny::tagList(shiny::icon("github"), "Visit GitHub repository")
+            shiny::tabPanel(
+              "Kinship and EBV",
+              shiny::br(),
+              shiny::verbatimTextOutput(ns("message1")),
+              shiny::uiOutput(ns("candidate_ebv_status")),
+              shiny::uiOutput(ns("ebv_upload_prompt")),
+              shiny::uiOutput(ns("message2")),
+              DT::DTOutput(ns("quadrants_table")),
+              DT::DTOutput(ns("matrix")),
+              style = "overflow-y: auto; height: 640px;"
+            ),
+            shiny::tabPanel(
+              "Optimum Contribution Selection",
+              shiny::br(),
+              shiny::div(
+                id    = "ocs_container",
+                style = "position: relative;",
+                shiny::div(
+                  id    = "ocs_loading",
+                  style = "display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255,255,255,0.8); z-index: 9999;",
+                  shiny::div(
+                    style = "position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%);",
+                    shiny::div(class = "ocs-spinner")
+                  )
+                ),
+                DT::DTOutput(ns("ocs_candidate_table")),
+                shiny::uiOutput(ns("ocs_solver_note")),
+                shiny::br(),
+                DT::DTOutput(ns("ocs_mating_table"))
+              ),
+              style = "overflow-y: auto; height: 640px;"
+            )
           )
         )
-      ),
-      shiny::mainPanel(
-        shiny::fluidRow(
-          shiny::column(
-            width = 12,
-            bs4Dash::box(
-              title       = "Status",
-              width       = 12,
-              collapsible = TRUE,
-              status      = "info",
-              shinyWidgets::progressBar(
-                id          = ns("pb_allomate"),
-                value       = 0,
-                status      = "info",
-                display_pct = TRUE,
-                striped     = TRUE,
-                title       = " "
-              )
-            )
+      ), # closes column(width = 6)
+      
+      # Column 3: Status + File Status + Guide
+      shiny::column(
+        width = 3,
+        
+        # Status / progress
+        bs4Dash::box(
+          title       = "Status",
+          width       = 12,
+          collapsible = TRUE,
+          status      = "info",
+          shinyWidgets::progressBar(
+            id          = ns("pb_allomate"),
+            value       = 0,
+            status      = "info",
+            display_pct = TRUE,
+            striped     = TRUE,
+            title       = " "
           )
         ),
-        shiny::br(),
-        bs4Dash::tabsetPanel(
-          id   = ns("main_tabs"),
-          type = "tabs",
-          shiny::tabPanel(
-            "Kinship and EBV",
-            shiny::br(),
-            shiny::verbatimTextOutput(ns("message1")),
-            shiny::uiOutput(ns("candidate_ebv_status")),
-            shiny::uiOutput(ns("ebv_upload_prompt")),
-            shiny::uiOutput(ns("message2")),
-            DT::DTOutput(ns("quadrants_table")),
-            DT::DTOutput(ns("matrix"))
-          ),
-          shiny::tabPanel(
-            "Optimum Contribution Selection",
-            shiny::br(),
-            shiny::div(
-              id    = "ocs_container",
-              style = "position: relative;",
-              shiny::div(
-                id    = "ocs_loading",
-                style = "display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255,255,255,0.8); z-index: 9999;",
-                shiny::div(
-                  style = "position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%);",
-                  shiny::div(class = "ocs-spinner")
-                )
-              ),
-              DT::DTOutput(ns("ocs_candidate_table")),
-              shiny::uiOutput(ns("ocs_solver_note")),
-              shiny::br(),
-              DT::DTOutput(ns("ocs_mating_table"))
-            )
-          )
+        
+        # Getting started / step guide
+        bs4Dash::box(
+          title       = "Getting Started",
+          width       = 12,
+          collapsible = TRUE,
+          collapsed   = FALSE,
+          status      = "info",
+          solidHeader = TRUE,
+          shiny::uiOutput(ns("dynamic_guide"))
+        ),
+        
+        # File status
+        bs4Dash::box(
+          title       = "File Status",
+          width       = 12,
+          collapsible = TRUE,
+          collapsed   = FALSE,
+          status      = "info",
+          solidHeader = TRUE,
+          shiny::htmlOutput(ns("file_status_display"))
         )
-      )
-    )
-  )
+      ) # closes column(width = 3)
+    ) # closes fluidRow
+  )   # closes tagList
 }
 
 #' AlloMate analysis module server
@@ -222,6 +269,15 @@ mod_allomate_server <- function(id, parent_session) {
       ebvs       = character()
     )
     
+    #### Reactive values ####
+    trait_counter             <- shiny::reactiveVal(1)
+    candidate_status          <- shiny::reactiveVal(list(ok = FALSE, error = NULL))
+    ocs_results_reactive      <- shiny::reactiveVal()
+    ebv_results_reactive      <- shiny::reactiveVal()
+    error_message             <- shiny::reactiveVal("")
+    pedigree_validation_stats <- shiny::reactiveVal(NULL)
+    ebv_data <- shiny::reactive({ process_ebvs(trait_counter(), input) })
+    
     #### Package status ####
     output$package_status_text <- shiny::renderText({ generate_package_status() })
     optisel_available      <- requireNamespace("optiSel", quietly = TRUE)
@@ -233,319 +289,6 @@ mod_allomate_server <- function(id, parent_session) {
     if (optisel_available) {
       options(allomate.force_greedy_mating = FALSE, allomate.force_qp_greedy = FALSE)
     }
-    
-    #### Help button ####
-    shiny::observeEvent(input$help_btn, {
-      shiny::showModal(
-        shiny::modalDialog(
-          title     = shiny::tagList(shiny::icon("circle-question"), " AlloMate — Help"),
-          size      = "l",
-          easyClose = TRUE,
-          footer    = shiny::modalButton("Close"),
-          help_content_allomate(id_prefix = "modal")
-        )
-      )
-    })
-    
-    #### Reactive values ####
-    trait_counter             <- shiny::reactiveVal(1)
-    candidate_status          <- shiny::reactiveVal(list(ok = FALSE, error = NULL))
-    ocs_results_reactive      <- shiny::reactiveVal()
-    ebv_results_reactive      <- shiny::reactiveVal()
-    error_message             <- shiny::reactiveVal("")
-    pedigree_validation_stats <- shiny::reactiveVal(NULL)
-    ebv_data <- shiny::reactive({ process_ebvs(trait_counter(), input) })
-    
-    #### Export cache ####
-    export_cache <- shiny::reactiveVal(NULL)
-    generate_export_zip <- function(dest_zip) {
-      safe_char <- function(x) if (is.null(x) || length(x) == 0) NA_character_ else as.character(x)
-      tmp_dir <- tempfile("export_tsvs")
-      dir.create(tmp_dir)
-      readme_text <- c(
-        "AlloMate Complete Results Report", "",
-        "This TSV collection contains all results from your AlloMate analysis:", "",
-        "Files included:",
-        "1. README - This overview and explanation",
-        "2. Filtered Results - Crosses meeting criteria (positive EBVs, kinship below threshold)",
-        "3. EBV Matrix - Complete matrix view with masked values",
-        "4. OCS Candidates - Selected candidates from Optimum Contribution Selection",
-        "5. Mating Plan - Recommended mating pairs from OCS",
-        "6. Parameters - Analysis parameters used", "",
-        "Data Details:",
-        "- Filtered Results: Only crosses with positive EBVs and kinship below threshold",
-        "- EBV Matrix: All possible crosses with values masked for failed criteria",
-        "- OCS Results: Available only after running Optimum Contribution Selection", "",
-        "Generated on:", as.character(Sys.Date())
-      )
-      write.table(data.frame(Text = readme_text, stringsAsFactors = FALSE),
-                  file.path(tmp_dir, "README.tsv"), sep = "\t", row.names = FALSE, quote = FALSE)
-      ebv_results <- ebv_results_reactive()
-      if (!is.null(ebv_results)) {
-        write.table(as.data.frame(ebv_results$filt_results_table),
-                    file.path(tmp_dir, "Filtered_Results.tsv"),
-                    sep = "\t", row.names = FALSE, quote = FALSE)
-        m_ids       <- unique(ebv_results$full_results$Male)
-        f_ids       <- unique(ebv_results$full_results$Female)
-        mat_for_csv <- matrix(NA_real_, nrow = length(m_ids), ncol = length(f_ids),
-                              dimnames = list(m_ids, f_ids))
-        if (nrow(ebv_results$filt_results_matrix) > 0) {
-          for (i in seq_len(nrow(ebv_results$filt_results_matrix))) {
-            m   <- ebv_results$filt_results_matrix$Male[i]
-            f   <- ebv_results$filt_results_matrix$Female[i]
-            val <- ebv_results$filt_results_matrix$EBV[i]
-            if (!is.na(m) && !is.na(f) &&
-                m %in% rownames(mat_for_csv) && f %in% colnames(mat_for_csv)) {
-              mat_for_csv[m, f] <- val
-            }
-          }
-        }
-        row_labels    <- rownames(mat_for_csv)
-        if (is.null(row_labels)) row_labels <- seq_len(nrow(mat_for_csv))
-        ebv_matrix_df <- data.frame(Male = row_labels, mat_for_csv,
-                                    check.names = FALSE, stringsAsFactors = FALSE)
-        write.table(ebv_matrix_df, file.path(tmp_dir, "EBV_Matrix.tsv"),
-                    sep = "\t", row.names = FALSE, quote = FALSE, na = "")
-      }
-      if (!is.null(ocs_results_reactive())) {
-        formatted_results <- tryCatch(format_ocs_results(ocs_results_reactive()), error = function(e) NULL)
-        if (!is.null(formatted_results)) {
-          write.table(as.data.frame(formatted_results$candidate_table),
-                      file.path(tmp_dir, "OCS_Candidates.tsv"),
-                      sep = "\t", row.names = FALSE, quote = FALSE)
-          write.table(as.data.frame(formatted_results$mating_table),
-                      file.path(tmp_dir, "Mating_Plan.tsv"),
-                      sep = "\t", row.names = FALSE, quote = FALSE)
-        }
-      }
-      params_data <- data.frame(
-        Parameter = c("Analysis Date", "Kinship Threshold", "Desired Inbreeding Rate", "Number of Offspring"),
-        Value     = c(as.character(Sys.Date()),
-                      safe_char(input$thresh),
-                      safe_char(input$inbreeding_rate),
-                      safe_char(input$num_offspring)),
-        stringsAsFactors = FALSE
-      )
-      write.table(params_data, file.path(tmp_dir, "Parameters.tsv"),
-                  sep = "\t", row.names = FALSE, quote = FALSE)
-      tsv_files <- list.files(tmp_dir)
-      zip::zip(zipfile = dest_zip, files = tsv_files, root = tmp_dir)
-      unlink(tmp_dir, recursive = TRUE)
-      TRUE
-    }
-    
-    shiny::observeEvent(
-      list(ebv_results_reactive(), ocs_results_reactive(),
-           input$thresh, input$inbreeding_rate, input$num_offspring),
-      {
-        tmp_zip <- tempfile(pattern = "allomate_export_", fileext = ".zip")
-        if (generate_export_zip(tmp_zip) && file.exists(tmp_zip)) {
-          old <- export_cache()
-          export_cache(tmp_zip)
-          if (!is.null(old) && file.exists(old)) unlink(old, force = TRUE)
-        }
-      },
-      ignoreNULL = FALSE
-    )
-    
-    session$onSessionEnded(function() {
-      cache <- shiny::isolate(export_cache())
-      if (!is.null(cache) && file.exists(cache)) unlink(cache, force = TRUE)
-    })
-    
-    output$download_all_results <- shiny::downloadHandler(
-      filename = function() paste0("AlloMate_results-", Sys.Date(), ".zip"),
-      content  = function(file) {
-        cache <- shiny::isolate(export_cache())
-        if (!is.null(cache) && file.exists(cache)) {
-          file.copy(cache, file, overwrite = TRUE)
-        } else {
-          generate_export_zip(file)
-        }
-      },
-      contentType = "application/zip"
-    )
-    shiny::outputOptions(output, "download_all_results", suspendWhenHidden = FALSE)
-    
-    #### Startup ####
-    output$dynamic_guide <- shiny::renderUI({
-      current_error <- error_message()
-      if (current_error != "") {
-        return(shiny::HTML(paste0(
-          "<div style='background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 8px; border-radius: 4px; margin-bottom: 10px;'>",
-          "<p style='color: #721c24; margin: 0;'><strong>Error occurred:</strong></p>",
-          "<p style='color: #721c24; margin: 5px 0; font-family: monospace; font-size: 11px;'>", current_error, "</p>",
-          "<p style='color: #721c24; margin: 5px 0 0 0; font-size: 12px;'>Need help? Click the Help button for detailed documentation.</p>",
-          "</div>"
-        )))
-      }
-      has_candidates  <- !is.null(input$candidate_file)
-      has_pedigree    <- !is.null(input$pedigree_file)
-      has_traits      <- trait_counter() > 0 &&
-        any(sapply(seq_len(trait_counter()), function(i) !is.null(input[[paste0("trait_file_", i)]])))
-      has_ocs_results <- !is.null(ocs_results_reactive())
-      pedigree_error       <- current_error != "" && grepl("error|pedigree|kinship", current_error, ignore.case = TRUE)
-      trait_error          <- current_error != "" && grepl("error|ebv|trait|weight",  current_error, ignore.case = TRUE)
-      ocs_error            <- current_error != "" && grepl("error|ocs",               current_error, ignore.case = TRUE)
-      cs                   <- candidate_status()
-      candidate_ready      <- isTRUE(cs$ok)
-      candidate_error_flag <- !is.null(cs$error)
-      get_step_label <- function(has_item, error_flag) {
-        if (error_flag) {
-          "<span style='color: #dc3545; font-weight: bold;'>[Error]</span>"
-        } else if (has_item) {
-          "<span style='color: #28a745; font-weight: bold;'>[Done]</span>"
-        } else {
-          "<span style='color: #6c757d;'>[Pending]</span>"
-        }
-      }
-      steps <- c(
-        sprintf("<p>%s <strong>Step 1:</strong> Upload your candidate list to begin the analysis</p>",
-                get_step_label(candidate_ready, candidate_error_flag)),
-        sprintf("<p>%s <strong>Step 2:</strong> Upload your pedigree file for kinship calculations</p>",
-                get_step_label(has_pedigree, pedigree_error)),
-        sprintf("<p>%s <strong>Step 3:</strong> Set your kinship threshold (optional)</p>",
-                get_step_label(has_pedigree, FALSE)),
-        sprintf("<p>%s <strong>Step 4:</strong> Add trait files and weights for breeding value analysis</p>",
-                get_step_label(has_traits, trait_error)),
-        sprintf("<p>%s <strong>Step 5:</strong> Configure OCS parameters and run analysis</p>",
-                get_step_label(has_ocs_results, ocs_error))
-      )
-      if (has_ocs_results) {
-        steps <- c(steps,
-                   "<p><strong>Analysis Complete!</strong></p>",
-                   "<p style='color: #28a745; font-weight: bold;'>Results are ready for review and export.</p>"
-        )
-      }
-      shiny::HTML(paste(steps, collapse = ""))
-    })
-    
-    #### File status display ####
-    output$file_status_display <- shiny::renderUI({
-      has_candidates <- !is.null(input$candidate_file)
-      has_pedigree   <- !is.null(input$pedigree_file)
-      has_ebv        <- !is.null(ebv_results_reactive())
-      has_ocs        <- !is.null(ocs_results_reactive())
-      current_error  <- error_message()
-      has_error      <- current_error != ""
-      cs             <- candidate_status()
-      candidate_ready      <- isTRUE(cs$ok)
-      candidate_error_flag <- !is.null(cs$error)
-      pedigree_error <- has_error && grepl("pedigree|kinship", current_error, ignore.case = TRUE)
-      ebv_error      <- has_error && grepl("ebv|trait|weight",  current_error, ignore.case = TRUE)
-      ocs_error      <- has_error && grepl("ocs",               current_error, ignore.case = TRUE)
-      get_status <- function(has_data, uploaded, has_specific_error,
-                             ready_text = "Ready", pending_text = "Not uploaded", error_text = "Error") {
-        if (has_specific_error) {
-          list(label = "[Error]",   color = "#dc3545")
-        } else if (has_data) {
-          list(label = "[Ready]",   color = "#28a745")
-        } else if (uploaded) {
-          list(label = "[Processing...]", color = "#ffc107")
-        } else {
-          list(label = paste0("[", pending_text, "]"), color = "#6c757d")
-        }
-      }
-      cand_ui <- if (candidate_error_flag) {
-        list(label = "[Error]", color = "#dc3545")
-      } else if (candidate_ready) {
-        list(label = "[Ready]", color = "#28a745")
-      } else if (has_candidates) {
-        list(label = "[Processing...]", color = "#ffc107")
-      } else {
-        list(label = "[Not uploaded]", color = "#6c757d")
-      }
-      ped_ui <- get_status(has_pedigree, has_pedigree, pedigree_error, "Ready", "Not uploaded")
-      ebv_ui <- get_status(has_ebv, has_candidates && has_pedigree, ebv_error, "Ready", "Pending")
-      ocs_ui <- get_status(has_ocs, FALSE, ocs_error, "Ready", "Not run")
-      make_line <- function(label, s) {
-        paste0(
-          "<strong>", label, ":</strong> ",
-          "<span style='color:", s$color, "; font-weight: bold;'>", s$label, "</span>"
-        )
-      }
-      status_lines <- c(
-        make_line("Candidate List", cand_ui),
-        make_line("Pedigree Data",  ped_ui),
-        make_line("EBV Matrix",     ebv_ui),
-        make_line("OCS Results",    ocs_ui)
-      )
-      all_ready <- candidate_ready && has_pedigree && has_ebv
-      download_status <- if (has_error) {
-        "<div style='background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 8px; margin-top: 10px; border-radius: 3px;'>
-        <p style='color: #721c24; margin: 0; font-size: 12px;'><strong>Error detected.</strong> Check the startup guide above for details.</p>
-        </div>"
-      } else if (all_ready) {
-        "<div style='background-color: #d4edda; border: 1px solid #c3e6cb; padding: 8px; margin-top: 10px; border-radius: 3px;'>
-        <p style='color: #155724; margin: 0; font-size: 12px;'><strong>Download ready.</strong> All core data is available.</p>
-        </div>"
-      } else {
-        "<div style='background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 8px; margin-top: 10px; border-radius: 3px;'>
-        <p style='color: #6c757d; margin: 0; font-size: 12px;'>Upload required files to enable download.</p>
-        </div>"
-      }
-      shiny::HTML(paste0(
-        "<div style='font-size: 12px; line-height: 1.8;'>",
-        paste(status_lines, collapse = "<br>"),
-        "</div>",
-        download_status
-      ))
-    })
-    
-    #### Pedigree status display ####
-    output$pedigree_status_display <- shiny::renderUI({
-      stats <- pedigree_validation_stats()
-      if (is.null(stats)) return(NULL)
-      get_count    <- function(val) if (is.null(val) || is.na(val)) 0L else as.integer(val)
-      format_count <- function(val) format(get_count(val), big.mark = ",", scientific = FALSE)
-      records        <- format_count(stats$records_loaded)
-      unknown_count  <- get_count(stats$unknown_parent_count)
-      circular_count <- get_count(stats$circular_reference_count)
-      missing_count  <- get_count(stats$missing_candidates)
-      duplicates     <- get_count(stats$duplicates_removed)
-      green_box <- paste0(
-        "<div style='background-color: #d4edda; border: 1px solid #c3e6cb; padding: 8px;",
-        " border-radius: 3px; margin-top: 10px; font-size: 12px;'>",
-        records, " records loaded</div>"
-      )
-      yellow_warnings <- c()
-      if (unknown_count > 0) yellow_warnings <- c(yellow_warnings,
-                                                  paste0("<p style='margin:", if (length(yellow_warnings) == 0) "0" else "4px 0 0", ";'>",
-                                                         format_count(stats$unknown_parent_count),
-                                                         " individuals with unknown parent(s) (treated as founders)</p>"))
-      if (circular_count > 0) yellow_warnings <- c(yellow_warnings,
-                                                   paste0("<p style='margin:", if (length(yellow_warnings) == 0) "0" else "4px 0 0", ";'>",
-                                                          format_count(stats$circular_reference_count),
-                                                          " circular references detected and broken at earliest generation</p>"))
-      if (missing_count > 0) yellow_warnings <- c(yellow_warnings,
-                                                  paste0("<p style='margin:", if (length(yellow_warnings) == 0) "0" else "4px 0 0", ";'>",
-                                                         format_count(stats$missing_candidates),
-                                                         " selection candidates missing from pedigree</p>"))
-      yellow_box <- if (length(yellow_warnings) > 0) {
-        paste0(
-          "<div style='background-color: #fff3cd; border: 1px solid #ffeeba; padding: 8px;",
-          " border-radius: 3px; margin-top: 6px; font-size: 12px;'>",
-          paste(yellow_warnings, collapse = ""), "</div>"
-        )
-      } else ""
-      red_box <- if (duplicates > 0) {
-        paste0(
-          "<div style='background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 8px;",
-          " border-radius: 3px; margin-top: 6px; font-size: 12px;'>",
-          format(duplicates, big.mark = ",", scientific = FALSE), " duplicates removed</div>"
-        )
-      } else ""
-      shiny::HTML(paste0(green_box, yellow_box, red_box))
-    })
-    
-    #### Trait counter ####
-    shiny::observeEvent(input$add_trait,    { trait_counter(trait_counter() + 1) })
-    shiny::observeEvent(input$remove_trait, { if (trait_counter() > 1) trait_counter(trait_counter() - 1) })
-    output$trait_inputs <- shiny::renderUI({ create_trait_inputs(trait_counter(), ns = ns) })
-    output$ocs_trait_inputs <- shiny::renderUI({
-      shiny::req(input$ocs_trait_counter)
-      create_ocs_trait_inputs(input$ocs_trait_counter, ns = ns)
-    })
     
     #### Candidates ####
     candidates_data <- shiny::reactive({
@@ -671,6 +414,15 @@ mod_allomate_server <- function(id, parent_session) {
       } else {
         NULL
       }
+    })
+    
+    #### Trait counter ####
+    shiny::observeEvent(input$add_trait,    { trait_counter(trait_counter() + 1) })
+    shiny::observeEvent(input$remove_trait, { if (trait_counter() > 1) trait_counter(trait_counter() - 1) })
+    output$trait_inputs <- shiny::renderUI({ create_trait_inputs(trait_counter(), ns = ns) })
+    output$ocs_trait_inputs <- shiny::renderUI({
+      shiny::req(input$ocs_trait_counter)
+      create_ocs_trait_inputs(input$ocs_trait_counter, ns = ns)
     })
     
     #### EBV observe ####
@@ -832,6 +584,52 @@ mod_allomate_server <- function(id, parent_session) {
       }
     )
     
+    #### Pedigree status display ####
+    output$pedigree_status_display <- shiny::renderUI({
+      stats <- pedigree_validation_stats()
+      if (is.null(stats)) return(NULL)
+      get_count    <- function(val) if (is.null(val) || is.na(val)) 0L else as.integer(val)
+      format_count <- function(val) format(get_count(val), big.mark = ",", scientific = FALSE)
+      records        <- format_count(stats$records_loaded)
+      unknown_count  <- get_count(stats$unknown_parent_count)
+      circular_count <- get_count(stats$circular_reference_count)
+      missing_count  <- get_count(stats$missing_candidates)
+      duplicates     <- get_count(stats$duplicates_removed)
+      green_box <- paste0(
+        "<div style='background-color: #d4edda; border: 1px solid #c3e6cb; padding: 8px;",
+        " border-radius: 3px; margin-top: 10px; font-size: 12px;'>",
+        records, " records loaded</div>"
+      )
+      yellow_warnings <- c()
+      if (unknown_count > 0) yellow_warnings <- c(yellow_warnings,
+                                                  paste0("<p style='margin:", if (length(yellow_warnings) == 0) "0" else "4px 0 0", ";'>",
+                                                         format_count(stats$unknown_parent_count),
+                                                         " individuals with unknown parent(s) (treated as founders)</p>"))
+      if (circular_count > 0) yellow_warnings <- c(yellow_warnings,
+                                                   paste0("<p style='margin:", if (length(yellow_warnings) == 0) "0" else "4px 0 0", ";'>",
+                                                          format_count(stats$circular_reference_count),
+                                                          " circular references detected and broken at earliest generation</p>"))
+      if (missing_count > 0) yellow_warnings <- c(yellow_warnings,
+                                                  paste0("<p style='margin:", if (length(yellow_warnings) == 0) "0" else "4px 0 0", ";'>",
+                                                         format_count(stats$missing_candidates),
+                                                         " selection candidates missing from pedigree</p>"))
+      yellow_box <- if (length(yellow_warnings) > 0) {
+        paste0(
+          "<div style='background-color: #fff3cd; border: 1px solid #ffeeba; padding: 8px;",
+          " border-radius: 3px; margin-top: 6px; font-size: 12px;'>",
+          paste(yellow_warnings, collapse = ""), "</div>"
+        )
+      } else ""
+      red_box <- if (duplicates > 0) {
+        paste0(
+          "<div style='background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 8px;",
+          " border-radius: 3px; margin-top: 6px; font-size: 12px;'>",
+          format(duplicates, big.mark = ",", scientific = FALSE), " duplicates removed</div>"
+        )
+      } else ""
+      shiny::HTML(paste0(green_box, yellow_box, red_box))
+    })
+    
     #### OCS server logic ####
     shiny::observeEvent(input$force_greedy_mating, {
       if (!ocs_checkboxes_enabled) return(NULL)
@@ -845,6 +643,7 @@ mod_allomate_server <- function(id, parent_session) {
     
     shiny::observeEvent(input$run_ocs_btn, {
       shiny::req(input$pedigree_file, input$candidate_file)
+      shinyjs::disable("download_all_results")
       if (ocs_checkboxes_enabled) {
         options(allomate.force_greedy_mating = isTRUE(input$force_greedy_mating))
         options(allomate.force_qp_greedy     = isTRUE(input$force_qp_greedy))
@@ -903,7 +702,7 @@ mod_allomate_server <- function(id, parent_session) {
           shiny::showNotification(paste0(warning_msg, ")."), type = "warning", duration = 8)
         }
         if (length(ebv_only_ids) > 0) {
-          shiny::showNotification("OCS: EBV records without candidates were ignored.",
+          shiny::showNotification("OCS: IDs with EBVs but not in the candidate list were ignored.",
                                   type = "warning", duration = 8)
         }
         candidates_filtered <- candidates_joined %>% dplyr::filter(!is.na(index_val))
@@ -934,6 +733,7 @@ mod_allomate_server <- function(id, parent_session) {
         }
         ocs_results_reactive(results)
         error_message("")
+        shinyjs::enable("download_all_results")
         formatted_results <- format_ocs_results(results)
         output$ocs_candidate_table <- DT::renderDT({
           DT::datatable(formatted_results$candidate_table,

@@ -1,6 +1,6 @@
 Package: AlloMate
 Title: Genetic Mate Allocation and Breeding Optimization Shiny App
-Version: 2.1.0
+Version: 2.2.0
 Authors@R: c(
   person("Josue",                 "Chinchilla-Vargas",
          role = c("aut", "cre"),
@@ -14,7 +14,6 @@ Authors@R: c(
 Description: AlloMate is a Shiny web application developed by the Breeding Insight team to support genetic mate allocation and breeding optimization. The app integrates pedigree-based kinship, estimated breeding values (EBVs), and Optimum Contribution Selection (OCS) to help breeding programs balance genetic gain while controlling inbreeding.
 License: Apache License (>= 2)
 Imports: 
-    BIGr,
     bs4Dash,
     config,
     golem,
@@ -35,9 +34,9 @@ Imports:
     quadprog
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 7.3.3
 Suggests: 
     testthat (>= 3.0.0),
     kinship2,
     optiSel
 Config/testthat/edition: 3
+Config/roxygen2/version: 8.0.0

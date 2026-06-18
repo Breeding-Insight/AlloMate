@@ -1,10 +1,12 @@
 # AlloMate — Genetic Mate Allocation and Breeding Optimization App
 
+[![Development Status](https://img.shields.io/badge/status-active%20development-yellow)](https://github.com/Breeding-Insight/AlloMate)
 [![R](https://img.shields.io/badge/R-%3E%3D%204.0-blue)](https://www.r-project.org/)
 [![Shiny](https://img.shields.io/badge/Shiny-Web%20Application-blueviolet)](https://shiny.posit.co/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![GitHub issues](https://img.shields.io/github/issues/Breeding-Insight/AlloMate)](https://github.com/Breeding-Insight/AlloMate/issues)
 [![GitHub pull requests](https://img.shields.io/github/issues-pr/Breeding-Insight/AlloMate)](https://github.com/Breeding-Insight/AlloMate/pulls)
+[![GitHub Release](https://img.shields.io/github/v/release/Breeding-Insight/AlloMate?include_prereleases)](https://github.com/Breeding-Insight/AlloMate/releases/latest)
 
 AlloMate is a Shiny web application developed by the Breeding Insight team
 to support genetic mate allocation and breeding optimization. The app integrates
@@ -23,7 +25,6 @@ Modern breeding programs must optimize selection decisions while managing inbree
 and long-term genetic diversity. AlloMate provides an interactive and reproducible
 framework for:
 
-- Validating and cleaning pedigree records prior to analysis
 - Evaluating genetic relatedness among breeding candidates
 - Combining multiple EBV traits using user-defined weights
 - Optimizing individual contributions via Optimum Contribution Selection
@@ -35,14 +36,6 @@ of breeding program designs.
 ---
 
 ## Key Features
-
-### Pedigree Cleaning
-
-- Detection of structural pedigree errors (e.g., missing parents, duplicate IDs,
-  sex conflicts)
-- Flagging of individuals with inconsistent or incomplete pedigree records
-- Interactive review and resolution of pedigree issues before downstream analysis
-- Summary reports of identified issues and applied corrections
 
 ### Breeding and Optimization
 
@@ -69,7 +62,7 @@ AlloMate uses a golem application structure, allowing it to be installed like
 a standard R package.
 
 ### Install from GitHub
-```{r}
+```r
 if (!requireNamespace("remotes", quietly = TRUE)) {
   install.packages("remotes")
 }
@@ -77,7 +70,7 @@ if (!requireNamespace("remotes", quietly = TRUE)) {
 remotes::install_github("Breeding-Insight/AlloMate")
 ```
 ### Run AlloMate
-```{r}
+```r
 AlloMate::run_app()
 ```
 ---
@@ -107,22 +100,18 @@ Optional:
    - Pedigree file (id, male_parent, female_parent)
    - EBV files for one or more traits
 
-2. Run pedigree cleaning:
-   - Review flagged structural errors and inconsistencies
-   - Apply or export corrections before proceeding with analysis
-
-3. Configure analysis parameters:
+2. Configure analysis parameters:
    - Trait weights (must sum to 1)
    - Kinship thresholds
    - OCS constraints
 
-4. Review outputs:
+3. Review outputs:
    - Kinship matrices and summaries
    - Combined EBV scores
    - Optimal contributions and mating plans
 
-5. Export results:
-   - Download Excel reports containing all outputs and diagnostics
+4. Export results:
+   - Download reports containing all outputs and diagnostics
 
 ---
 
@@ -130,9 +119,9 @@ Optional:
 
 If you use AlloMate in research or breeding analyses, please cite it as:
 
-Chinchilla-Vargas, J., Ackerman, A. J., Taniguti, C. H., & Sandercock, A. M.  
-AlloMate: Genetic Mate Allocation and Breeding Optimization App.
-  - RRID: SCR_027115
+Chinchilla-Vargas, J., Ackerman, A. J., & Taniguti, C. H., Sandercock, A. M.  
+AlloMate: Genetic Mate Allocation and Breeding Optimization App.  
+RRID: SCR_027115
 
 ---
 

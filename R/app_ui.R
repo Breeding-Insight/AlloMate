@@ -52,12 +52,6 @@ app_ui <- function(request) {
           tags$li(
             class = "header",
             style = "color: grey; margin-top: 18px; margin-bottom: 10px; padding-left: 15px;",
-            "Data Wrangling"
-          ),
-          bs4Dash::menuItem("Pedigree Cleaning", tabName = "ped_cleaner", icon = shiny::icon("diagram-project")),
-          tags$li(
-            class = "header",
-            style = "color: grey; margin-top: 18px; margin-bottom: 10px; padding-left: 15px;",
             "Analysis"
           ),
           bs4Dash::menuItem("Mate Allocation", tabName = "allomate", icon = shiny::icon("bullseye")),
@@ -114,7 +108,6 @@ app_ui <- function(request) {
         ),
         bs4Dash::tabItems(
           bs4Dash::tabItem(tabName = "home", mod_Home_ui("Home_1")),
-          bs4Dash::tabItem(tabName = "ped_cleaner", mod_ped_cleaner_ui("ped_cleaner_1")),
           bs4Dash::tabItem(tabName = "allomate",    mod_allomate_ui("allomate_1")),
           bs4Dash::tabItem(tabName = "help",        mod_help_ui("help_1"))
         )
