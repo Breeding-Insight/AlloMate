@@ -189,6 +189,20 @@ help_content_allomate <- function(collapse_fn = NULL, id_prefix = "") {
 
     shiny::hr(style = "margin: 8px 0;"),
 
+    # ── Tutorial Data ────────────────────────────────────────────────
+    shiny::h6(shiny::tagList(shiny::icon("download"), " Tutorial Data"),
+              style = "font-weight: bold;"),
+    shiny::p("Download a complete example data set for the Mate Allocation workflow.",
+             style = "color: #6c757d; font-size: 12px; margin-bottom: 8px;"),
+    shiny::tags$a(
+      href = "www/tutorial_data.zip",
+      download = "tutorial_data.zip",
+      class = "btn btn-sm btn-outline-danger",
+      shiny::tagList(shiny::icon("download"), " Download Tutorial Data")
+    ),
+
+    shiny::hr(style = "margin: 8px 0;"),
+
     # ── Parameters ───────────────────────────────────────────────────
     shiny::h6(shiny::tagList(shiny::icon("sliders"), " Parameters Explained"),
               style = "font-weight: bold;"),

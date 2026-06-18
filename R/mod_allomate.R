@@ -326,7 +326,8 @@ mod_allomate_server <- function(id, parent_session) {
         value = 40, status = "info", title = "Processing pedigree..."
       )
       tryCatch({
-        raw_ped <- readr::read_table(input$pedigree_file$datapath)
+        raw_ped <- read_uploaded_table(input$pedigree_file, file_type = "PEDIGREE")
+        names(raw_ped) <- tolower(names(raw_ped))
         required_cols <- c("id", "male_parent", "female_parent")
         missing_cols  <- setdiff(required_cols, colnames(raw_ped))
         if (length(missing_cols) > 0) {
@@ -656,8 +657,9 @@ mod_allomate_server <- function(id, parent_session) {
         value = 82, status = "info", title = "Reading input files..."
       )
       tryCatch({
-        ped_data   <- read.table(input$pedigree_file$datapath, header = TRUE, stringsAsFactors = FALSE)
-        candidates <- read.table(input$candidate_file$datapath, header = TRUE, stringsAsFactors = FALSE)
+        ped_data <- read_uploaded_table(input$pedigree_file, file_type = "PEDIGREE")
+        names(ped_data) <- tolower(names(ped_data))
+        candidates <- candidates_data()$candidates
         required_cols <- c("id", "male_parent", "female_parent")
         missing_cols  <- setdiff(required_cols, colnames(ped_data))
         if (length(missing_cols) > 0) {
@@ -776,222 +778,5 @@ mod_allomate_server <- function(id, parent_session) {
         shiny::tags$strong("Solver note: "), info
       )
     })
-    
-    #### Download Results ####
-    output$download_all_results <- shiny::downloadHandler(
-      filename = function() paste0("AlloMate_results-", Sys.Date(), ".zip"),
-      content  = function(file) {
-        shiny::req(ebv_results_reactive())
-        tmp_dir <- tempfile("allomate_export")
-        dir.create(tmp_dir)
-        on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
-        
-        # README
-        readme_text <- c(
-          "AlloMate Complete Results Report", "",
-          "This TSV collection contains all results from your AlloMate analysis:", "",
-          "Files included:",
-          "1. README - This overview and explanation",
-          "2. Filtered Results - Crosses meeting criteria (positive EBVs, kinship below threshold)",
-          "3. EBV Matrix - Complete matrix view with masked values",
-          "4. OCS Candidates - Selected candidates from Optimum Contribution Selection",
-          "5. Mating Plan - Recommended mating pairs from OCS",
-          "6. Parameters - Analysis parameters used", "",
-          "Generated on:", as.character(Sys.Date())
-        )
-        write.table(data.frame(Text = readme_text, stringsAsFactors = FALSE),
-                    file.path(tmp_dir, "README.tsv"), sep = "\t", row.names = FALSE, quote = FALSE)
-        
-        # Filtered results and EBV matrix
-        ebv_results <- ebv_results_reactive()
-        if (!is.null(ebv_results)) {
-          write.table(as.data.frame(ebv_results$filt_results_table),
-                      file.path(tmp_dir, "Filtered_Results.tsv"),
-                      sep = "\t", row.names = FALSE, quote = FALSE)
-          
-          m_ids       <- unique(ebv_results$full_results$Male)
-          f_ids       <- unique(ebv_results$full_results$Female)
-          mat_for_csv <- matrix(NA_real_, nrow = length(m_ids), ncol = length(f_ids),
-                                dimnames = list(m_ids, f_ids))
-          for (i in seq_len(nrow(ebv_results$filt_results_matrix))) {
-            m <- ebv_results$filt_results_matrix$Male[i]
-            f <- ebv_results$filt_results_matrix$Female[i]
-            v <- ebv_results$filt_results_matrix$EBV[i]
-            if (!is.na(m) && !is.na(f) &&
-                m %in% rownames(mat_for_csv) && f %in% colnames(mat_for_csv))
-              mat_for_csv[m, f] <- v
-          }
-          ebv_matrix_df <- data.frame(Male = rownames(mat_for_csv), mat_for_csv,
-                                      check.names = FALSE, stringsAsFactors = FALSE)
-          write.table(ebv_matrix_df, file.path(tmp_dir, "EBV_Matrix.tsv"),
-                      sep = "\t", row.names = FALSE, quote = FALSE, na = "")
-        }
-        
-        # OCS results
-        if (!is.null(ocs_results_reactive())) {
-          formatted_results <- tryCatch(format_ocs_results(ocs_results_reactive()), error = function(e) NULL)
-          if (!is.null(formatted_results)) {
-            write.table(as.data.frame(formatted_results$candidate_table),
-                        file.path(tmp_dir, "OCS_Candidates.tsv"),
-                        sep = "\t", row.names = FALSE, quote = FALSE)
-            write.table(as.data.frame(formatted_results$mating_table),
-                        file.path(tmp_dir, "Mating_Plan.tsv"),
-                        sep = "\t", row.names = FALSE, quote = FALSE)
-          }
-        }
-        
-        # Parameters
-        write.table(
-          data.frame(
-            Parameter = c("Analysis Date", "Kinship Threshold", "Desired Inbreeding Rate", "Number of Offspring"),
-            Value     = c(as.character(Sys.Date()), input$thresh, input$inbreeding_rate, input$num_offspring)
-          ),
-          file.path(tmp_dir, "Parameters.tsv"), sep = "\t", row.names = FALSE, quote = FALSE
-        )
-        
-        zip_files <- list.files(tmp_dir)
-        zip::zip(zipfile = file, files = zip_files, root = tmp_dir)
-      },
-      contentType = "application/zip"
-    )
-    
-    #### Startup ####
-    output$dynamic_guide <- shiny::renderUI({
-      current_error <- error_message()
-      if (current_error != "") {
-        return(shiny::HTML(paste0(
-          "<div style='background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 8px; border-radius: 4px; margin-bottom: 10px;'>",
-          "<p style='color: #721c24; margin: 0;'><strong>Error occurred:</strong></p>",
-          "<p style='color: #721c24; margin: 5px 0; font-family: monospace; font-size: 11px;'>", current_error, "</p>",
-          "<p style='color: #721c24; margin: 5px 0 0 0; font-size: 12px;'>Need help? Click the Help button for detailed documentation.</p>",
-          "</div>"
-        )))
-      }
-      has_candidates  <- !is.null(input$candidate_file)
-      has_pedigree    <- !is.null(input$pedigree_file)
-      has_traits      <- trait_counter() > 0 &&
-        any(sapply(seq_len(trait_counter()), function(i) !is.null(input[[paste0("trait_file_", i)]])))
-      has_ocs_results <- !is.null(ocs_results_reactive())
-      pedigree_error       <- current_error != "" && grepl("error|pedigree|kinship", current_error, ignore.case = TRUE)
-      trait_error          <- current_error != "" && grepl("error|ebv|trait|weight",  current_error, ignore.case = TRUE)
-      ocs_error            <- current_error != "" && grepl("error|ocs",               current_error, ignore.case = TRUE)
-      cs                   <- candidate_status()
-      candidate_ready      <- isTRUE(cs$ok)
-      candidate_error_flag <- !is.null(cs$error)
-      get_step_label <- function(has_item, error_flag) {
-        if (error_flag) {
-          "<span style='color: #dc3545; font-weight: bold;'>[Error]</span>"
-        } else if (has_item) {
-          "<span style='color: #28a745; font-weight: bold;'>[Done]</span>"
-        } else {
-          "<span style='color: #6c757d;'>[Pending]</span>"
-        }
-      }
-      steps <- c(
-        sprintf("<p>%s <strong>Step 1:</strong> Upload your candidate list to begin the analysis</p>",
-                get_step_label(candidate_ready, candidate_error_flag)),
-        sprintf("<p>%s <strong>Step 2:</strong> Upload your pedigree file for kinship calculations</p>",
-                get_step_label(has_pedigree, pedigree_error)),
-        sprintf("<p>%s <strong>Step 3:</strong> Set your kinship threshold (optional)</p>",
-                get_step_label(has_pedigree, FALSE)),
-        sprintf("<p>%s <strong>Step 4:</strong> Add trait files and weights for breeding value analysis</p>",
-                get_step_label(has_traits, trait_error)),
-        sprintf("<p>%s <strong>Step 5:</strong> Configure OCS parameters and run analysis</p>",
-                get_step_label(has_ocs_results, ocs_error))
-      )
-      if (has_ocs_results) {
-        steps <- c(steps,
-                   "<p><strong>Analysis Complete!</strong></p>",
-                   "<p style='color: #28a745; font-weight: bold;'>Results are ready for review and export.</p>"
-        )
-      }
-      shiny::HTML(paste(steps, collapse = ""))
-    })
-    
-    #### File status display ####
-    output$file_status_display <- shiny::renderUI({
-      has_candidates <- !is.null(input$candidate_file)
-      has_pedigree   <- !is.null(input$pedigree_file)
-      has_ebv        <- !is.null(ebv_results_reactive())
-      has_ocs        <- !is.null(ocs_results_reactive())
-      current_error  <- error_message()
-      has_error      <- current_error != ""
-      cs             <- candidate_status()
-      candidate_ready      <- isTRUE(cs$ok)
-      candidate_error_flag <- !is.null(cs$error)
-      pedigree_error <- has_error && grepl("pedigree|kinship", current_error, ignore.case = TRUE)
-      ebv_error      <- has_error && grepl("ebv|trait|weight",  current_error, ignore.case = TRUE)
-      ocs_error      <- has_error && grepl("ocs",               current_error, ignore.case = TRUE)
-      get_status <- function(has_data, uploaded, has_specific_error,
-                             ready_text = "Ready", pending_text = "Not uploaded", error_text = "Error") {
-        if (has_specific_error) {
-          list(label = "[Error]",   color = "#dc3545")
-        } else if (has_data) {
-          list(label = "[Ready]",   color = "#28a745")
-        } else if (uploaded) {
-          list(label = "[Processing...]", color = "#ffc107")
-        } else {
-          list(label = paste0("[", pending_text, "]"), color = "#6c757d")
-        }
-      }
-      cand_ui <- if (candidate_error_flag) {
-        list(label = "[Error]", color = "#dc3545")
-      } else if (candidate_ready) {
-        list(label = "[Ready]", color = "#28a745")
-      } else if (has_candidates) {
-        list(label = "[Processing...]", color = "#ffc107")
-      } else {
-        list(label = "[Not uploaded]", color = "#6c757d")
-      }
-      ped_ui <- get_status(has_pedigree, has_pedigree, pedigree_error, "Ready", "Not uploaded")
-      ebv_ui <- get_status(has_ebv, has_candidates && has_pedigree, ebv_error, "Ready", "Pending")
-      ocs_ui <- get_status(has_ocs, FALSE, ocs_error, "Ready", "Not run")
-      make_line <- function(label, s) {
-        paste0(
-          "<strong>", label, ":</strong> ",
-          "<span style='color:", s$color, "; font-weight: bold;'>", s$label, "</span>"
-        )
-      }
-      status_lines <- c(
-        make_line("Candidate List", cand_ui),
-        make_line("Pedigree Data",  ped_ui),
-        make_line("EBV Matrix",     ebv_ui),
-        make_line("OCS Results",    ocs_ui)
-      )
-      all_ready <- candidate_ready && has_pedigree && has_ebv
-      download_status <- if (has_error) {
-        "<div style='background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 8px; margin-top: 10px; border-radius: 3px;'>
-        <p style='color: #721c24; margin: 0; font-size: 12px;'><strong>Error detected.</strong> Check the startup guide above for details.</p>
-        </div>"
-      } else if (all_ready) {
-        "<div style='background-color: #d4edda; border: 1px solid #c3e6cb; padding: 8px; margin-top: 10px; border-radius: 3px;'>
-        <p style='color: #155724; margin: 0; font-size: 12px;'><strong>Download ready.</strong> All core data is available.</p>
-        </div>"
-      } else {
-        "<div style='background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 8px; margin-top: 10px; border-radius: 3px;'>
-        <p style='color: #6c757d; margin: 0; font-size: 12px;'>Upload required files to enable download.</p>
-        </div>"
-      }
-      shiny::HTML(paste0(
-        "<div style='font-size: 12px; line-height: 1.8;'>",
-        paste(status_lines, collapse = "<br>"),
-        "</div>",
-        download_status
-      ))
-    })
-    
-    #### Help button ####
-    shiny::observeEvent(input$help_btn, {
-      shiny::showModal(
-        shiny::modalDialog(
-          title     = shiny::tagList(shiny::icon("circle-question"), " AlloMate — Help"),
-          size      = "l",
-          easyClose = TRUE,
-          footer    = shiny::modalButton("Close"),
-          help_content_allomate(id_prefix = "modal")
-        )
-      )
-    })
-    
-  }) # closes moduleServer
-} # closes mod_allomate_server
+  })
+}

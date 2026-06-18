@@ -31,13 +31,95 @@ fallback_kinship <- function(ped) {
   matrix(0.5, n, n, dimnames = list(ped$id, ped$id))
 }
 
+#' Read an uploaded delimited text table
+#' @param file Uploaded Shiny file object or file path
+#' @param file_type Type of file for error messages
+#' @return data.frame
+read_uploaded_table <- function(file, file_type = "file") {
+  path <- if (is.character(file)) file else file$datapath
+  name <- if (is.character(file)) basename(file) else file$name
+  if (is.null(path) || !file.exists(path)) {
+    stop(sprintf("%s: uploaded file is missing or unavailable.", file_type))
+  }
+
+  encodings <- c("UTF-8", "UTF-16", "UTF-16LE", "UTF-16BE", "Latin1")
+  readers <- list(
+    list(
+      label = "whitespace-delimited",
+      fn = function(path, locale) {
+        readr::read_table(path, locale = locale, show_col_types = FALSE)
+      }
+    ),
+    list(
+      label = "tab-delimited",
+      fn = function(path, locale) {
+        readr::read_tsv(path, locale = locale, show_col_types = FALSE)
+      }
+    ),
+    list(
+      label = "comma-delimited",
+      fn = function(path, locale) {
+        readr::read_csv(path, locale = locale, show_col_types = FALSE)
+      }
+    )
+  )
+
+  ext <- tolower(tools::file_ext(name))
+  if (identical(ext, "csv")) {
+    readers <- readers[c(3, 2, 1)]
+  } else if (identical(ext, "tsv")) {
+    readers <- readers[c(2, 1, 3)]
+  }
+
+  first_error <- NULL
+  best_single_column <- NULL
+
+  for (encoding in encodings) {
+    locale <- readr::locale(encoding = encoding)
+    for (reader in readers) {
+      df <- tryCatch(
+        reader$fn(path, locale),
+        error = function(e) {
+          if (is.null(first_error)) first_error <<- e$message
+          NULL
+        }
+      )
+
+      if (is.null(df)) next
+
+      df <- as.data.frame(df, stringsAsFactors = FALSE)
+      names(df) <- trimws(sub("^\ufeff", "", names(df)))
+
+      if (ncol(df) > 1) {
+        return(df)
+      }
+
+      if (is.null(best_single_column)) best_single_column <- df
+    }
+  }
+
+  if (!is.null(best_single_column)) {
+    stop(sprintf(
+      "%s decoded, but appears to contain only one column. Check that it is tab-, comma-, or whitespace-delimited text.",
+      file_type
+    ))
+  }
+
+  details <- if (is.null(first_error)) "" else paste0(" Last read error: ", first_error)
+  stop(sprintf(
+    "%s could not be decoded. Save it as UTF-8 or UTF-16 delimited text and upload again.%s",
+    file_type,
+    details
+  ))
+}
+
 #' Read and process candidate files
 #' @importFrom readr read_table
 #' @importFrom dplyr filter pull
 #' @param file file input
 #' @return list
 read_candidates <- function(file) {
-  df <- read_table(file$datapath, show_col_types = FALSE)
+  df <- read_uploaded_table(file, file_type = "CANDIDATES")
   names(df) <- tolower(names(df))
   if (!"id" %in% names(df) && "candidate" %in% names(df)) {
     names(df)[names(df) == "candidate"] <- "id"
@@ -180,7 +262,7 @@ process_ebvs <- function(trait_counter, input, prefix = "") {
     file_i   <- input[[paste0(prefix, "trait_file_",   i)]]
     weight_i <- input[[paste0(prefix, "trait_weight_", i)]]
     if (!is.null(file_i) && !is.null(weight_i)) {
-      df_raw <- read_table(file_i$datapath)
+      df_raw <- read_uploaded_table(file_i, file_type = paste("EBV trait", i))
       if (!"ID"  %in% names(df_raw)) names(df_raw)[1] <- "ID"
       if (!"EBV" %in% names(df_raw)) names(df_raw)[2] <- "EBV"
       df_raw$EBV <- as.numeric(df_raw$EBV)
