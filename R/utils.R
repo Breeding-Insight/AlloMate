@@ -234,7 +234,12 @@ clean_pedigree <- function(ped, return_stats = FALSE) {
 compute_kinship_matrix <- function(ped, males, females) {
   kinship2_available <- requireNamespace("kinship2", quietly = TRUE)
   kinship_matrix <- if (exists("kinship2_available") && kinship2_available) kinship2::kinship(ped) else fallback_kinship(ped)
-  kin_mat_sel    <- kinship_matrix[males, females]
+  # Restrict to candidates actually present in the kinship matrix. A candidate id
+  # missing from the pedigree would otherwise trigger "subscript out of bounds"
+  # and abort kinship-quantile computation, leaving only the EBV quantile row.
+  males   <- intersect(males,   rownames(kinship_matrix))
+  females <- intersect(females, colnames(kinship_matrix))
+  kin_mat_sel    <- kinship_matrix[males, females, drop = FALSE]
   kin_quads      <- tibble(
     Data = "Kinship",
     Q25  = quantile(kin_mat_sel, 0.25),

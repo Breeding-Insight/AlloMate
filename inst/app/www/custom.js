@@ -35,6 +35,21 @@ $(document).ready(function() {
     subtree: true
   });
 
+  // When the results box is maximized/restored, DataTables that were initialised
+  // while their tab was hidden render with collapsed columns. Re-adjust every
+  // DataTable in the card after the layout settles so the quantile header (and
+  // the OCS/Mate tables) paint at their correct size.
+  $(document).on('click', '[data-card-widget="maximize"]', function() {
+    var card = $(this).closest('.card');
+    setTimeout(function() {
+      card.find('table.dataTable').each(function() {
+        if ($.fn.dataTable.isDataTable(this)) {
+          $(this).DataTable().columns.adjust();
+        }
+      });
+    }, 400);
+  });
+
   // Your existing tab script
   $('#cnv_1-sample_select_tabs li.active > a').addClass('active');
 

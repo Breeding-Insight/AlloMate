@@ -294,9 +294,14 @@ help_content_allomate <- function(collapse_fn = NULL, id_prefix = "") {
         crosses that pass the kinship threshold and have a positive index EBV."
       )),
       shiny::tags$li(shiny::HTML(
-        "<strong>Optimum Contribution Selection</strong> — shows the selected candidates
-        with their optimised contributions, and the recommended mating plan with allocated
-        offspring counts."
+        "<strong>OCS</strong> — shows the selected candidates with their optimised
+        contributions from Optimum Contribution Selection."
+      )),
+      shiny::tags$li(shiny::HTML(
+        "<strong>Mate Allocation</strong> — shows the recommended mating plan with
+        allocated offspring counts. Maximize the results panel (expand icon, top-right)
+        for a dashboard view: the Kinship/EBV quantile summary as a full-width header
+        with the OCS and Mate Allocation tables side by side beneath it."
       ))
     ),
 
