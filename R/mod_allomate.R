@@ -122,11 +122,18 @@ mod_allomate_ui <- function(id) {
             style = "border-bottom: 1px solid #dee2e6; padding-bottom: 6px; margin-bottom: 10px;"
           ),
           shiny::p(
-            "Download all results in a single zip file:",
+            "Download the mate allocation plan (with kinship and OCS tabs) as an Excel file:",
             style = "color: #6c757d; font-size: 12px; margin-bottom: 10px;"
           ),
           shinyjs::disabled(
-            downloadButton(ns("download_all_results"), "Download Results")
+            downloadButton(ns("download_mate_allocation"), "Download Mate Allocation")
+          ),
+          shiny::p(
+            "Or download every results table (kinship, EBV matrix, OCS, mating plan, parameters) as a zip of TSV files:",
+            style = "color: #6c757d; font-size: 12px; margin: 10px 0;"
+          ),
+          shinyjs::disabled(
+            downloadButton(ns("download_all_tsv"), "Download All Tables (.zip)")
           ),
           shiny::hr(),
           
@@ -616,8 +623,27 @@ mod_allomate_server <- function(id, parent_session) {
       }
     )
 
-    #### Download all results (zip of TSVs) ####
-    output$download_all_results <- shiny::downloadHandler(
+    #### Download mate allocation (single xlsx: Mate Allocation / Kinship / OCS) ####
+    output$download_mate_allocation <- shiny::downloadHandler(
+      filename = function() paste0("AlloMate_mate_allocation-", Sys.Date(), ".xlsx"),
+      content  = function(file) {
+        shiny::req(ebv_results_reactive(), ocs_results_reactive())
+
+        fmt <- format_ocs_results(ocs_results_reactive())
+
+        sheets <- list(
+          "Mate Allocation" = as.data.frame(fmt$mating_table),
+          "Kinship"         = as.data.frame(ebv_results_reactive()$filt_results_table),
+          "OCS"             = as.data.frame(fmt$candidate_table)
+        )
+
+        save_xlsx_with_fallback(file, sheets, active_sheet = "Mate Allocation")
+      },
+      contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+    #### Download all tables (zip of TSVs) ####
+    output$download_all_tsv <- shiny::downloadHandler(
       filename = function() paste0("AlloMate_results-", Sys.Date(), ".zip"),
       content  = function(file) {
         shiny::req(ebv_results_reactive())
@@ -758,7 +784,8 @@ mod_allomate_server <- function(id, parent_session) {
         bs4Dash::updateBox("results_box", action = "toggle", session = session)
       if (isFALSE(input$instructions_box$collapsed))
         bs4Dash::updateBox("instructions_box", action = "toggle", session = session)
-      shinyjs::disable("download_all_results")
+      shinyjs::disable("download_mate_allocation")
+      shinyjs::disable("download_all_tsv")
       if (ocs_checkboxes_enabled) {
         options(allomate.force_greedy_mating = isTRUE(input$force_greedy_mating))
         options(allomate.force_qp_greedy     = isTRUE(input$force_qp_greedy))
@@ -848,7 +875,8 @@ mod_allomate_server <- function(id, parent_session) {
         }
         ocs_results_reactive(results)
         error_message("")
-        shinyjs::enable("download_all_results")
+        shinyjs::enable("download_mate_allocation")
+        shinyjs::enable("download_all_tsv")
         formatted_results <- format_ocs_results(results)
         output$ocs_candidate_table <- DT::renderDT({
           DT::datatable(formatted_results$candidate_table,
