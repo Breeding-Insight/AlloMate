@@ -224,7 +224,7 @@ clean_pedigree <- function(ped, return_stats = FALSE) {
   return(final_ped)
 }
 
-#' Compute kinship matrix
+#' Compute kinship matrix from a pedigree
 #' @importFrom tibble tibble as_tibble column_to_rownames
 #' @importFrom tidyr pivot_longer
 #' @param ped pedigree
@@ -234,8 +234,24 @@ clean_pedigree <- function(ped, return_stats = FALSE) {
 compute_kinship_matrix <- function(ped, males, females) {
   kinship2_available <- requireNamespace("kinship2", quietly = TRUE)
   kinship_matrix <- if (exists("kinship2_available") && kinship2_available) kinship2::kinship(ped) else fallback_kinship(ped)
+  summarize_kinship_matrix(kinship_matrix, males, females)
+}
+
+#' Summarize a kinship matrix (quantiles + long-format table)
+#'
+#' Shared by compute_kinship_matrix() (pedigree-derived) and the "upload
+#' precomputed matrix" path in mod_allomate, so any A/G/H-derived kinship
+#' matrix can populate the same Kinship & EBV preview.
+#'
+#' @importFrom tibble tibble as_tibble column_to_rownames
+#' @importFrom tidyr pivot_longer
+#' @param kinship_matrix A kinship matrix (rownames/colnames = individual IDs)
+#' @param males male candidate ids
+#' @param females female candidate ids
+#' @return list
+summarize_kinship_matrix <- function(kinship_matrix, males, females) {
   # Restrict to candidates actually present in the kinship matrix. A candidate id
-  # missing from the pedigree would otherwise trigger "subscript out of bounds"
+  # missing from the matrix would otherwise trigger "subscript out of bounds"
   # and abort kinship-quantile computation, leaving only the EBV quantile row.
   males   <- intersect(males,   rownames(kinship_matrix))
   females <- intersect(females, colnames(kinship_matrix))
@@ -309,6 +325,61 @@ format_id_list <- function(ids, limit = 4) {
   } else {
     paste(c(ids[seq_len(limit)], "(5 or more)"), collapse = ", ")
   }
+}
+
+#' Render pedigree-cleaning validation stats as status boxes
+#'
+#' Shared by mod_allomate.R (pedigree_status_display) and mod_matrix_builder.R
+#' so both pedigree upload points show the same records-loaded / unknown-parent /
+#' circular-reference / missing-candidate / duplicates-removed summary produced
+#' by clean_pedigree(..., return_stats = TRUE).
+#'
+#' @param stats A stats list as returned by clean_pedigree()$stats, optionally
+#'   with a missing_candidates / missing_candidate_ids entry added by the caller.
+#' @return A shiny::HTML() object, or NULL if stats is NULL.
+#' @noRd
+render_pedigree_status_html <- function(stats) {
+  if (is.null(stats)) return(NULL)
+  get_count    <- function(val) if (is.null(val) || is.na(val)) 0L else as.integer(val)
+  format_count <- function(val) format(get_count(val), big.mark = ",", scientific = FALSE)
+  records        <- format_count(stats$records_loaded)
+  unknown_count  <- get_count(stats$unknown_parent_count)
+  circular_count <- get_count(stats$circular_reference_count)
+  missing_count  <- get_count(stats$missing_candidates)
+  duplicates     <- get_count(stats$duplicates_removed)
+  green_box <- paste0(
+    "<div style='background-color: #d4edda; border: 1px solid #c3e6cb; padding: 8px;",
+    " border-radius: 3px; margin-top: 10px; font-size: 12px;'>",
+    records, " records loaded</div>"
+  )
+  yellow_warnings <- c()
+  if (unknown_count > 0) yellow_warnings <- c(yellow_warnings,
+                                              paste0("<p style='margin:", if (length(yellow_warnings) == 0) "0" else "4px 0 0", ";'>",
+                                                     format_count(stats$unknown_parent_count),
+                                                     " individuals with unknown parent(s) (treated as founders)</p>"))
+  if (circular_count > 0) yellow_warnings <- c(yellow_warnings,
+                                               paste0("<p style='margin:", if (length(yellow_warnings) == 0) "0" else "4px 0 0", ";'>",
+                                                      format_count(stats$circular_reference_count),
+                                                      " circular references detected and broken at earliest generation</p>"))
+  if (missing_count > 0) yellow_warnings <- c(yellow_warnings,
+                                              paste0("<p style='margin:", if (length(yellow_warnings) == 0) "0" else "4px 0 0", ";'>",
+                                                     format_count(stats$missing_candidates),
+                                                     " selection candidates missing from pedigree</p>"))
+  yellow_box <- if (length(yellow_warnings) > 0) {
+    paste0(
+      "<div style='background-color: #fff3cd; border: 1px solid #ffeeba; padding: 8px;",
+      " border-radius: 3px; margin-top: 6px; font-size: 12px;'>",
+      paste(yellow_warnings, collapse = ""), "</div>"
+    )
+  } else ""
+  red_box <- if (duplicates > 0) {
+    paste0(
+      "<div style='background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 8px;",
+      " border-radius: 3px; margin-top: 6px; font-size: 12px;'>",
+      format(duplicates, big.mark = ",", scientific = FALSE), " duplicates removed</div>"
+    )
+  } else ""
+  shiny::HTML(paste0(green_box, yellow_box, red_box))
 }
 
 #' Build a Bootstrap collapsible panel card
