@@ -173,13 +173,19 @@ clean_pedigree <- function(ped, return_stats = FALSE) {
   duplicates_removed       <- sum(duplicated(ped_chr$id))
   
   # Fix messy parents while still in character form to avoid factor NA assignment
+  # (an id used as a male_parent in some rows and a female_parent in others —
+  # ambiguous sex — so both roles are treated as unknown wherever they occur)
   messy_parents <- setdiff(
     intersect(ped_chr$male_parent, ped_chr$female_parent),
     c("0", NA, "")
   )
+  messy_parent_count <- sum(
+    ped_chr$male_parent %in% messy_parents | ped_chr$female_parent %in% messy_parents,
+    na.rm = TRUE
+  )
   ped_chr$male_parent[ped_chr$male_parent %in% messy_parents]     <- "0"
   ped_chr$female_parent[ped_chr$female_parent %in% messy_parents] <- "0"
-  
+
   # Remove duplicates
   ped_chr <- ped_chr[!duplicated(ped_chr$id), ]
   
@@ -216,11 +222,18 @@ clean_pedigree <- function(ped, return_stats = FALSE) {
       records_loaded           = total_records,
       unknown_parent_count     = unknown_parent_count,
       circular_reference_count = circular_reference_count,
-      duplicates_removed       = duplicates_removed
+      duplicates_removed       = duplicates_removed,
+      messy_parent_count       = messy_parent_count
     )
-    return(list(pedigree = final_ped, stats = stats))
+    # Cleaned tabular pedigree (id/male_parent/female_parent, post dedup and
+    # circular-reference removal, pre kinship2 conversion). Callers that need
+    # a plain Ind/Sire/Dam table (e.g. AGHmatrix via build_relationship_matrix())
+    # should use this instead of reverse-engineering it from the kinship2
+    # pedigree object's internal findex/mindex bookkeeping.
+    cleaned_df <- ped_chr[, c("id", "male_parent", "female_parent")]
+    return(list(pedigree = final_ped, stats = stats, cleaned_df = cleaned_df))
   }
-  
+
   return(final_ped)
 }
 
@@ -347,6 +360,7 @@ render_pedigree_status_html <- function(stats) {
   circular_count <- get_count(stats$circular_reference_count)
   missing_count  <- get_count(stats$missing_candidates)
   duplicates     <- get_count(stats$duplicates_removed)
+  messy_count    <- get_count(stats$messy_parent_count)
   green_box <- paste0(
     "<div style='background-color: #d4edda; border: 1px solid #c3e6cb; padding: 8px;",
     " border-radius: 3px; margin-top: 10px; font-size: 12px;'>",
@@ -365,6 +379,10 @@ render_pedigree_status_html <- function(stats) {
                                               paste0("<p style='margin:", if (length(yellow_warnings) == 0) "0" else "4px 0 0", ";'>",
                                                      format_count(stats$missing_candidates),
                                                      " selection candidates missing from pedigree</p>"))
+  if (messy_count > 0) yellow_warnings <- c(yellow_warnings,
+                                            paste0("<p style='margin:", if (length(yellow_warnings) == 0) "0" else "4px 0 0", ";'>",
+                                                   format_count(stats$messy_parent_count),
+                                                   " relationships used an individual as both a male_parent and a female_parent (ambiguous sex); that parent was treated as unknown for those rows</p>"))
   yellow_box <- if (length(yellow_warnings) > 0) {
     paste0(
       "<div style='background-color: #fff3cd; border: 1px solid #ffeeba; padding: 8px;",

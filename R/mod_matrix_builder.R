@@ -149,7 +149,16 @@ mod_matrix_builder_server <- function(id, parent_session = NULL) {
             ))
           }
           cleaned_ped <- clean_pedigree(raw_ped, return_stats = TRUE)
-          pedigree    <- cleaned_ped$pedigree
+          # Use the plain id/male_parent/female_parent table (post dedup and
+          # circular-reference cleanup), not the kinship2 pedigree object.
+          # kinship2::pedigree()/fixParents() may insert synthetic "hidden
+          # spouse" founders for children left with only one known parent
+          # (e.g. after the ambiguous-sex fixup below), tracked via internal
+          # row-index bookkeeping (findex/mindex) rather than plain ids —
+          # reconstructing Sire/Dam strings from that for AGHmatrix is not
+          # reliable. AGHmatrix::Amatrix() does its own pedigree validation,
+          # so it's safe to hand it the plain cleaned table directly.
+          pedigree <- cleaned_ped$cleaned_df
           pedigree_validation_stats(cleaned_ped$stats)
         }
 

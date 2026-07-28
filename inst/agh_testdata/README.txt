@@ -63,8 +63,22 @@ How to test
 
 Expected sanity checks
 ----------------------
-- candidate_A_matrix.csv diagonal: 1.0000 for C01/C02/C03/C05 (no inbreeding),
-  1.1250 for C04/C06/C07/C08 (F = 0.125, since their parents share a
+- candidate_A_matrix.csv diagonal: 1.0000 for C01/C03/C06/C07 (no inbreeding),
+  1.1250 for C02/C04/C05/C08 (F = 0.125, since their parents share a
   grandparent on both sides).
+- C01 & C07 are full sibs (parents G1_01 x G1_04): relationship = 0.5000.
+- C04 & C08 are full sibs (parents G1_02 x G1_05): relationship = 0.6250
+  (higher than the usual 0.5 because G1_02 and G1_05 themselves share a
+  parent, M001).
 - Kinship threshold: a value around 0.06-0.08 will start excluding some of
   the more related candidate pairs, useful for testing the threshold filter.
+
+Note
+----
+Each generation-1 individual (G1_01..G1_05) is used consistently as either a
+male_parent or a female_parent everywhere it appears in pedigree.txt
+(G1_01/G1_02/G1_03 = sires, G1_04/G1_05 = dams). If you edit this file, keep
+that consistent — clean_pedigree() treats an id used as both a male_parent
+and a female_parent as ambiguous and zeroes out both roles for the affected
+rows (reported as a warning in the pedigree status box), which silently
+turns two-parent relationships into one-parent ones.

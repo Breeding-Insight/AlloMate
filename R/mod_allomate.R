@@ -127,6 +127,14 @@ mod_allomate_ui <- function(id) {
             ns("num_offspring"), "Number of Offspring",
             value = 100, min = 10, step = 1
           ),
+          shiny::numericInput(
+            ns("ocs_seed"), "Random Seed (optional)",
+            value = NA, step = 1
+          ),
+          shiny::p(
+            "For replicable results: leave blank for a different result each run, or set a number to get the same OCS/mating plan every time for the same inputs.",
+            style = "color: #6c757d; font-size: 11px; margin-top: -8px; margin-bottom: 8px;"
+          ),
           shiny::conditionalPanel(
             condition = sprintf("output['%s'] == '1'", ns("ocs_checkbox_mode")),
             shiny::checkboxInput(
@@ -760,8 +768,9 @@ mod_allomate_server <- function(id, parent_session) {
         # Parameters
         write.table(
           data.frame(
-            Parameter = c("Analysis Date", "Kinship Threshold", "Desired Inbreeding Rate", "Number of Offspring"),
-            Value     = c(as.character(Sys.Date()), input$thresh, input$inbreeding_rate, input$num_offspring)
+            Parameter = c("Analysis Date", "Kinship Threshold", "Desired Inbreeding Rate", "Number of Offspring", "Random Seed"),
+            Value     = c(as.character(Sys.Date()), input$thresh, input$inbreeding_rate, input$num_offspring,
+                          if (!is.null(input$ocs_seed) && !is.na(input$ocs_seed)) input$ocs_seed else "Not set (random)")
           ),
           file.path(tmp_dir, "Parameters.tsv"), sep = "\t", row.names = FALSE, quote = FALSE
         )
@@ -834,6 +843,10 @@ mod_allomate_server <- function(id, parent_session) {
           shiny::showModal(shiny::modalDialog(
             title = "Invalid Weights", "Weights must sum to 1.", easyClose = TRUE
           ))
+          shinyWidgets::updateProgressBar(
+            session = session, id = "pb_allomate",
+            value = 100, status = "danger", title = "Failed: weights must sum to 1"
+          )
           return(NULL)
         }
         joint_ebvs           <- calculate_index(ebv_result$joint_ebvs, ebv_result$rel_weights)
@@ -863,6 +876,9 @@ mod_allomate_server <- function(id, parent_session) {
           session = session, id = "pb_allomate",
           value = 93, status = "info", title = "Running OCS optimisation..."
         )
+        if (!is.null(input$ocs_seed) && !is.na(input$ocs_seed)) {
+          set.seed(input$ocs_seed)
+        }
         results <- run_ocs(
           candidates_df           = candidates_filtered,
           kinship_matrix          = kinship_matrix,
