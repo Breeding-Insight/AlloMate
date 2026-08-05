@@ -51,6 +51,13 @@ How to test
    - Builds an 18x18 combined matrix (13 genotyped + 5 pedigree-only founders).
    - Download it, then upload it in Mate Allocation via "Upload precomputed
      matrix (A/G/H)" to run OCS off the H matrix instead of pedigree-only A.
+   - Note: G is blended toward the pedigree block A22 (default 0.95*G +
+     0.05*A22) before Hmatrix() is called. This is required, not a tuning
+     nicety — a VanRaden G is centred by sample allele frequency, which makes
+     it singular by construction, and Hmatrix() inverts the genotyped block.
+     Without the blend this step fails on every dataset, including this one.
+   - "Martini" is the only H method offered, because it is the only one
+     AGHmatrix implements that AlloMate can supply arguments for.
 
 5. Mate Allocation (precomputed matrix route, no AGHmatrix needed):
    - Candidate list:        candidates.txt

@@ -58,9 +58,12 @@ mod_matrix_builder_ui <- function(id) {
           shiny::numericInput(ns("ploidy"), "Ploidy", value = 2, min = 2, step = 2),
           shiny::conditionalPanel(
             condition = sprintf("input['%s'] == 'H'", ns("matrix_type")),
+            # AGHmatrix::Hmatrix implements only "Martini" and "Munoz". Munoz
+            # needs a markers argument build_relationship_matrix() does not
+            # pass, so Martini is the only method that can actually run.
             shiny::selectInput(
               ns("h_method"), "H matrix method",
-              choices  = c("Martini", "Legarra", "YangAll", "YangSingle"),
+              choices  = c("Martini"),
               selected = "Martini"
             )
           ),

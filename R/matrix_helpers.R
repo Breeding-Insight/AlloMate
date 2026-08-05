@@ -145,14 +145,31 @@ pedigree_to_df <- function(pedigree) {
 #'   (rownames = IDs), markers in columns. Required for "G" and "H".
 #' @param ploidy Ploidy level (default 2)
 #' @param g_method Method passed to AGHmatrix::Gmatrix (default "VanRaden")
-#' @param h_method Method passed to AGHmatrix::Hmatrix (default "Martini")
+#' @param h_method Method passed to AGHmatrix::Hmatrix. AGHmatrix implements
+#'   only "Martini" and "Munoz"; "Munoz" additionally requires a markers
+#'   argument that this function does not supply, so "Martini" is the only
+#'   supported value (default "Martini").
+#' @param blend_weight Weight on G when blending the genomic matrix toward the
+#'   corresponding pedigree block A22 before building H (default 0.95, i.e.
+#'   0.95 * G + 0.05 * A22). See Details.
 #' @return numeric relationship matrix (relationship scale, not kinship/0.5 scale)
+#'
+#' @details
+#' For matrix_type "H", G is blended toward A22 (the pedigree block for the
+#' genotyped individuals) before being handed to AGHmatrix::Hmatrix(). This is
+#' the standard ssGBLUP treatment and it is required, not optional:
+#' Gmatrix(method = "VanRaden") centres each marker column using allele
+#' frequencies estimated from the sample itself, which places the all-ones
+#' vector in G's null space and makes G singular by construction for any input.
+#' Hmatrix(method = "Martini") inverts the genotyped block G22 with solve(),
+#' so an unblended G fails on every dataset regardless of marker count.
 build_relationship_matrix <- function(matrix_type,
-                                      pedigree  = NULL,
-                                      genotypes = NULL,
-                                      ploidy    = 2,
-                                      g_method  = "VanRaden",
-                                      h_method  = "Martini") {
+                                      pedigree     = NULL,
+                                      genotypes    = NULL,
+                                      ploidy       = 2,
+                                      g_method     = "VanRaden",
+                                      h_method     = "Martini",
+                                      blend_weight = 0.95) {
   matrix_type <- match.arg(matrix_type, c("A", "G", "H"))
   if (!requireNamespace("AGHmatrix", quietly = TRUE)) {
     stop("The AGHmatrix package is required to build A/G/H matrices. Install it with install.packages(\"AGHmatrix\").")
@@ -175,9 +192,42 @@ build_relationship_matrix <- function(matrix_type,
     A = build_A(),
     G = build_G(),
     H = {
+      if (!identical(h_method, "Martini")) {
+        stop(sprintf(
+          "H matrix method '%s' is not supported. AGHmatrix::Hmatrix implements only 'Martini' and 'Munoz', and 'Munoz' requires marker data that AlloMate does not supply. Use 'Martini'.",
+          h_method
+        ))
+      }
+      if (!is.numeric(blend_weight) || length(blend_weight) != 1 ||
+          is.na(blend_weight) || blend_weight <= 0 || blend_weight > 1) {
+        stop("blend_weight must be a single number greater than 0 and at most 1.")
+      }
+
       A <- build_A()
       G <- build_G()
-      AGHmatrix::Hmatrix(A = A, G = G, ploidy = ploidy, method = h_method)
+
+      # Genotyped individuals must also appear in the pedigree so that G can be
+      # blended against their pedigree block. Intersect rather than indexing A
+      # directly: an upload may carry genotyped IDs absent from the pedigree.
+      shared <- intersect(rownames(G), rownames(A))
+      if (length(shared) == 0) {
+        stop("No genotyped individuals were found in the pedigree. Check that IDs in the marker file match the pedigree file.")
+      }
+      if (length(shared) < nrow(G)) {
+        stop(sprintf(
+          "%d of %d genotyped individuals are missing from the pedigree (e.g. %s). An H matrix needs every genotyped individual to appear in the pedigree.",
+          nrow(G) - length(shared), nrow(G),
+          paste(setdiff(rownames(G), shared)[1:min(3, nrow(G) - length(shared))], collapse = ", ")
+        ))
+      }
+
+      # Blend G toward A22. Without this the VanRaden-centred G is singular and
+      # Hmatrix()'s solve(G22) fails on every dataset - see Details.
+      G <- G[shared, shared, drop = FALSE]
+      A22 <- A[shared, shared, drop = FALSE]
+      G_blended <- blend_weight * G + (1 - blend_weight) * A22
+
+      AGHmatrix::Hmatrix(A = A, G = G_blended, ploidy = ploidy, method = h_method)
     }
   )
 }

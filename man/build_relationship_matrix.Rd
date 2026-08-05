@@ -11,7 +11,8 @@ build_relationship_matrix(
   genotypes = NULL,
   ploidy = 2,
   g_method = "VanRaden",
-  h_method = "Martini"
+  h_method = "Martini",
+  blend_weight = 0.95
 )
 }
 \arguments{
@@ -28,7 +29,14 @@ male_parent, female_parent. Required for "A" and "H".}
 
 \item{g_method}{Method passed to AGHmatrix::Gmatrix (default "VanRaden")}
 
-\item{h_method}{Method passed to AGHmatrix::Hmatrix (default "Martini")}
+\item{h_method}{Method passed to AGHmatrix::Hmatrix. AGHmatrix implements
+only "Martini" and "Munoz"; "Munoz" additionally requires a markers
+argument that this function does not supply, so "Martini" is the only
+supported value (default "Martini").}
+
+\item{blend_weight}{Weight on G when blending the genomic matrix toward the
+corresponding pedigree block A22 before building H (default 0.95, i.e.
+0.95 * G + 0.05 * A22). See Details.}
 }
 \value{
 numeric relationship matrix (relationship scale, not kinship/0.5 scale)
@@ -36,4 +44,14 @@ numeric relationship matrix (relationship scale, not kinship/0.5 scale)
 \description{
 Build a pedigree-based (A), genomic (G), or combined (H) relationship
 matrix using the AGHmatrix package.
+}
+\details{
+For matrix_type "H", G is blended toward A22 (the pedigree block for the
+genotyped individuals) before being handed to AGHmatrix::Hmatrix(). This is
+the standard ssGBLUP treatment and it is required, not optional:
+Gmatrix(method = "VanRaden") centres each marker column using allele
+frequencies estimated from the sample itself, which places the all-ones
+vector in G's null space and makes G singular by construction for any input.
+Hmatrix(method = "Martini") inverts the genotyped block G22 with solve(),
+so an unblended G fails on every dataset regardless of marker count.
 }
