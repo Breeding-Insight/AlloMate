@@ -11,10 +11,10 @@
 #' @param desired_inbreeding_rate Target inbreeding rate constraint
 #' @param num_offspring Number of offspring to allocate
 #' @param per_pair_kinship_limit Optional maximum kinship allowed for any mating pair
-#' 
+#'
 #' @importFrom dplyr filter
 #' @importFrom magrittr %>%
-#' 
+#'
 #' @return List with Candidate and Mating results
 run_ocs <- function(candidates_df,
                     kinship_matrix,
@@ -23,11 +23,11 @@ run_ocs <- function(candidates_df,
                     num_offspring,
                     per_pair_kinship_limit = NULL) {
   using_optisel <-  requireNamespace("optiSel", quietly = TRUE)
-  
+
   if (!using_optisel) {
     stop("❌ OCS functionality is not available. Load optiSel or enable the custom fallback before running OCS.")
   }
-  
+
   phen <- data.frame(
     Indiv = candidates_df$id,
     Sex = ifelse(candidates_df$sex == "M", "male", "female"),
@@ -39,7 +39,7 @@ run_ocs <- function(candidates_df,
   sKin <- kinship_matrix[candidate_ids, candidate_ids, drop = FALSE]
   rownames(sKin) <- candidate_ids
   colnames(sKin) <- candidate_ids
-  
+
   if (using_optisel) {
     cand <- optiSel::candes(phen = phen, pKin = sKin)
     con <- list(ub.pKin = desired_inbreeding_rate)
@@ -49,7 +49,7 @@ run_ocs <- function(candidates_df,
     con <- list(ub.pKin = desired_inbreeding_rate)
     Offspring <- custom_opticont(method = "max.BV", cand = cand, con = con)
   }
-  
+
   if (using_optisel && "summary" %in% names(Offspring)) {
     # Check if any constraints failed (OK = FALSE)
     failed_constraints <- Offspring$summary[Offspring$summary$OK == FALSE & !is.na(Offspring$summary$OK), ]
@@ -59,7 +59,7 @@ run_ocs <- function(candidates_df,
                  "Try increasing the inbreeding rate threshold or check your kinship matrix."))
     }
   }
-  
+
   # Guard against empty or invalid solution (infeasible constraint)
   if (is.null(Offspring$parent) || nrow(Offspring$parent) == 0) {
     stop(paste0("❌ No feasible OCS solution found under the current inbreeding constraint (ub.pKin = ",
@@ -67,21 +67,21 @@ run_ocs <- function(candidates_df,
                 "This typically means your candidate population is too closely related to meet this target. ",
                 "Try increasing the inbreeding rate threshold (e.g., 0.10 or higher) or reducing the number of offspring."))
   }
-  
+
   # Preserve BV if present; backfill from phen if missing
   Candidate <- Offspring$parent
   if (!"BV" %in% names(Candidate)) {
     Candidate$BV <- phen$BV[match(Candidate$Indiv, phen$Indiv)]
   }
-  
+
   # Additional check: verify non-zero contributions
   if (nrow(Candidate) == 0 || all(Candidate$oc == 0)) {
-    stop(paste0("❌ No feasible OCS solution found under the current inbreeding constraint (ub.pKin = ", 
+    stop(paste0("❌ No feasible OCS solution found under the current inbreeding constraint (ub.pKin = ",
                 desired_inbreeding_rate, "). ",
                 "This typically means your candidate population is too closely related to meet this target. ",
                 "Try increasing the inbreeding rate threshold (e.g., 0.10 or higher) or reducing the number of offspring."))
   }
-  
+
   if (!is.null(per_pair_kinship_limit)) {
     if (!is.numeric(per_pair_kinship_limit) || length(per_pair_kinship_limit) != 1 ||
         is.na(per_pair_kinship_limit) || per_pair_kinship_limit <= 0 ||
@@ -89,7 +89,7 @@ run_ocs <- function(candidates_df,
       stop("❌ Per-pair kinship limit must be a numeric value between 0 and 1.")
     }
   }
-  
+
   # Safe to call noffspring now that Candidate has valid data
   Candidate$n <- if (using_optisel) {
     optiSel::noffspring(Candidate, num_offspring)$nOff
@@ -100,12 +100,12 @@ run_ocs <- function(candidates_df,
   if (length(unique(Candidate$Sex)) < 2) {
     stop("❌ OCS resulted in only one sex being selected. Cannot generate mating pairs.")
   }
-  
+
   selected_ids <- Candidate$Indiv
   sKin_subset <- sKin[selected_ids, selected_ids, drop = FALSE]
-  
+
   should_use_custom_matings <- !is.null(per_pair_kinship_limit) || !using_optisel
-  
+
   if (!should_use_custom_matings) {
     Mating <- optiSel::matings(Candidate, Kin = sKin_subset)
     if (nrow(Mating) > 0 && !"Kin" %in% names(Mating)) {
@@ -126,13 +126,13 @@ run_ocs <- function(candidates_df,
       max_pair_kinship = per_pair_kinship_limit
     )
   }
-  
+
   if (nrow(Mating) == 0) {
     stop("❌ No feasible mating plan could be generated under the chosen settings. Try increasing the per-pair kinship limit or adjusting offspring counts.")
   }
-  
+
   validate_mating_consistency(Candidate, Mating)
-  
+
   list(Candidate = Candidate, Mating = Mating)
 }
 
@@ -147,14 +147,14 @@ reconcile_offspring_with_matings <- function(Candidate, Mating) {
     Candidate$n <- 0
     return(Candidate[0, ])
   }
-  
+
   if (!all(c("Sire", "Dam", "n") %in% names(Mating))) {
     stop("❌ Mating plan is missing required columns (Sire, Dam, n).")
   }
-  
+
   male_totals <- tapply(Mating$n, Mating$Sire, sum)
   female_totals <- tapply(Mating$n, Mating$Dam, sum)
-  
+
   Candidate$n <- ifelse(
     Candidate$Sex == "male",
     male_totals[Candidate$Indiv],
@@ -171,32 +171,32 @@ validate_mating_consistency <- function(Candidate, Mating) {
   if (nrow(Mating) == 0) {
     stop("❌ No matings available to validate.")
   }
-  
+
   required_cols <- c("Sire", "Dam", "n")
   if (!all(required_cols %in% names(Mating))) {
     stop("❌ Mating plan is missing required columns (Sire, Dam, n).")
   }
-  
+
   if (!"n" %in% names(Candidate)) {
     stop("❌ Candidate table is missing target offspring counts (n).")
   }
-  
+
   male_idx <- Candidate$Sex == "male"
   female_idx <- Candidate$Sex == "female"
-  
+
   expected_males <- setNames(Candidate$n[male_idx], Candidate$Indiv[male_idx])
   expected_females <- setNames(Candidate$n[female_idx], Candidate$Indiv[female_idx])
-  
+
   actual_males <- tapply(Mating$n, Mating$Sire, sum)
   actual_females <- tapply(Mating$n, Mating$Dam, sum)
-  
+
   if (is.null(actual_males)) {
     actual_males <- setNames(numeric(0), character(0))
   }
   if (is.null(actual_females)) {
     actual_females <- setNames(numeric(0), character(0))
   }
-  
+
   check_counts <- function(expected_vec, actual_vec, label) {
     if (length(expected_vec) == 0) {
       return()
@@ -221,10 +221,10 @@ validate_mating_consistency <- function(Candidate, Mating) {
       stop(sprintf("❌ %s mating plan inconsistent with target offspring counts (%s).", label, details))
     }
   }
-  
+
   check_counts(expected_males, actual_males, "Male")
   check_counts(expected_females, actual_females, "Female")
-  
+
   invisible(TRUE)
 }
 
@@ -235,45 +235,45 @@ validate_mating_consistency <- function(Candidate, Mating) {
 #' @param desired_inbreeding_rate Target inbreeding rate
 #' @param num_offspring Number of offspring
 #' @return TRUE if valid, throws error if invalid
-validate_ocs_inputs <- function(candidates_df, kinship_matrix, ebv_index, 
+validate_ocs_inputs <- function(candidates_df, kinship_matrix, ebv_index,
                                 desired_inbreeding_rate, num_offspring) {
   # Check candidates data
   if (is.null(candidates_df) || nrow(candidates_df) == 0) {
     stop("❌ No candidates provided")
   }
-  
+
   required_cols <- c("id", "sex")
   missing_cols <- setdiff(required_cols, names(candidates_df))
   if (length(missing_cols) > 0) {
     stop(paste("❌ Missing required columns in candidates:", paste(missing_cols, collapse = ", ")))
   }
-  
+
   # Check sex balance
   n_males <- sum(candidates_df$sex == "M")
   n_females <- sum(candidates_df$sex == "F")
   if (n_males == 0 || n_females == 0) {
     stop("❌ Need both males and females for OCS analysis")
   }
-  
+
   # Check kinship matrix
   if (is.null(kinship_matrix) || nrow(kinship_matrix) == 0) {
     stop("❌ Kinship matrix is empty or invalid")
   }
-  
+
   # Check EBV indices
   if (is.null(ebv_index) || length(ebv_index) != nrow(candidates_df)) {
     stop("❌ EBV indices must match number of candidates")
   }
-  
+
   # Check parameters
   if (desired_inbreeding_rate <= 0 || desired_inbreeding_rate > 1) {
     stop("❌ Desired inbreeding rate must be between 0 and 1")
   }
-  
+
   if (num_offspring <= 0 || num_offspring %% 1 != 0) {
     stop("❌ Number of offspring must be a positive integer")
   }
-  
+
   TRUE
 }
 
@@ -289,10 +289,10 @@ format_ocs_results <- function(results) {
     mutate(`Optimal Contribution (%)` = round(oc * 100, 1)) %>%
     rename(`ID` = Indiv, `# of offspring` = n) %>%
     select(ID, Sex, `Optimal Contribution (%)`, `# of offspring`)
-  
+
   # Format mating table - handle different column naming schemes
   mating_df <- results$Mating
-  
+
   # Check and standardize column names (optiSel vs custom implementation)
   if ("Sire" %in% names(mating_df)) {
     mating_df <- mating_df %>% rename(Male = Sire)
@@ -310,7 +310,7 @@ format_ocs_results <- function(results) {
     # If no kinship column found, add a placeholder
     mating_df$Kinship <- NA
   }
-  
+
   # Estimate expected EBV for each mating pair by averaging parent EBVs
   bv_lookup <- results$Candidate %>%
     select(Indiv, BV)
@@ -318,7 +318,7 @@ format_ocs_results <- function(results) {
   dam_bv <- bv_lookup$BV[match(mating_df$Female, bv_lookup$Indiv)]
   expected_bv <- rowMeans(cbind(sire_bv, dam_bv), na.rm = TRUE)
   expected_bv[is.nan(expected_bv)] <- NA_real_
-  
+
   # Ensure numeric columns remain numeric (n and Kinship should be numeric for export)
   # Rename n to a more descriptive name for export
   mating_table <- mating_df %>%
@@ -331,7 +331,7 @@ format_ocs_results <- function(results) {
     rename(`# Offspring` = n) %>%
     mutate(`Expected EBV` = round(expected_bv, 3)) %>%
     select(Male, Female, Kinship, `# Offspring`, `Expected EBV`)
-  
+
   # Calculate summary statistics - handle different kinship column names
   kinship_values <- NA
   if ("Kin" %in% names(results$Mating)) {
@@ -343,7 +343,7 @@ format_ocs_results <- function(results) {
   } else if ("Kinship" %in% names(mating_df)) {
     kinship_values <- mating_df$Kinship
   }
-  
+
   summary_stats <- list(
     n_candidates = nrow(results$Candidate),
     n_males = sum(results$Candidate$Sex == "male"),
@@ -357,7 +357,7 @@ format_ocs_results <- function(results) {
       if (is.null(info)) NA_character_ else info
     }
   )
-  
+
   list(
     candidate_table = candidate_table,
     mating_table = mating_table,
@@ -381,7 +381,7 @@ reset_ocs_runtime <- function() {
 #' @return Workbook object ready for saving
 create_ocs_workbook <- function(results, params = NULL, kinship_threshold = NULL) {
   wb <- createWorkbook()
-  
+
   # Add README sheet
   addWorksheet(wb, "README")
   readme_text <- c(
@@ -407,7 +407,7 @@ create_ocs_workbook <- function(results, params = NULL, kinship_threshold = NULL
     "The patterns in your genetic data have been thoroughly analyzed."
   )
   writeData(wb, "README", readme_text)
-  
+
   # Add optimal contributions
   addWorksheet(wb, "Optimal Contributions")
   contrib_df <- results$Candidate %>%
@@ -415,13 +415,13 @@ create_ocs_workbook <- function(results, params = NULL, kinship_threshold = NULL
     mutate(`Contribution (%)` = round(oc * 100, 2)) %>%
     rename(`ID` = Indiv, `# Offspring` = n)
   writeData(wb, "Optimal Contributions", contrib_df)
-  
+
   # Add mating plan
   addWorksheet(wb, "Mating Plan")
-  
+
   # Handle different column naming schemes for mating results
   mating_export <- results$Mating
-  
+
   # Standardize kinship column name
   if ("Kin" %in% names(mating_export)) {
     mating_export <- mating_export %>% mutate(Kinship = round(Kin, 4))
@@ -432,13 +432,13 @@ create_ocs_workbook <- function(results, params = NULL, kinship_threshold = NULL
   } else {
     mating_export$Kinship <- NA
   }
-  
+
   # Optionally enforce per-pair kinship threshold before export
   if (!is.null(kinship_threshold)) {
     mating_export <- mating_export %>%
       filter(is.na(Kinship) | Kinship < kinship_threshold)
   }
-  
+
   # Select and rename columns based on what's available
   if (all(c("Sire", "Dam") %in% names(mating_export))) {
     mating_df <- mating_export %>%
@@ -454,6 +454,6 @@ create_ocs_workbook <- function(results, params = NULL, kinship_threshold = NULL
       rename(`# Offspring` = n)
   }
   writeData(wb, "Mating Plan", mating_df)
-  
+
   wb
 }

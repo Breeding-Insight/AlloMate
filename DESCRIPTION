@@ -34,9 +34,10 @@ Imports:
     quadprog
 Encoding: UTF-8
 LazyData: true
-Suggests: 
+Suggests:
     testthat (>= 3.0.0),
     kinship2,
-    optiSel
+    optiSel,
+    AGHmatrix
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.0.0

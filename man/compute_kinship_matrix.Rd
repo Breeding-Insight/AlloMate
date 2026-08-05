@@ -2,7 +2,7 @@
 % Please edit documentation in R/utils.R
 \name{compute_kinship_matrix}
 \alias{compute_kinship_matrix}
-\title{Compute kinship matrix}
+\title{Compute kinship matrix from a pedigree}
 \usage{
 compute_kinship_matrix(ped, males, females)
 }
@@ -17,5 +17,5 @@ compute_kinship_matrix(ped, males, females)
 list
 }
 \description{
-Compute kinship matrix
+Compute kinship matrix from a pedigree
 }
