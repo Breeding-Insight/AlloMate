@@ -40,6 +40,9 @@ of breeding program designs.
 ### Breeding and Optimization
 
 - Pedigree-based kinship matrix calculation
+- Matrix Builder: compute pedigree (A), genomic (G), or combined single-step (H)
+  relationship matrices with the AGHmatrix package, then use them as the kinship
+  source for mate allocation in place of (or alongside) the pedigree
 - Support for multiple EBV traits with configurable weights (weights must sum to 1)
 - Optimum Contribution Selection (OCS) to balance gain and inbreeding
 - Kinship threshold filtering to exclude unfavorable crosses
@@ -90,6 +93,7 @@ Key R packages used by AlloMate include:
 Optional:
 
 - optiSel (used when available for Optimum Contribution Selection)
+- AGHmatrix (used by the Matrix Builder to compute A/G/H relationship matrices)
 
 ---
 
@@ -97,7 +101,8 @@ Optional:
 
 1. Upload required input files:
    - Candidate list (IDs and sex)
-   - Pedigree file (id, male_parent, female_parent)
+   - Pedigree file (id, male_parent, female_parent), or a precomputed A/G/H
+     relationship matrix built in the Matrix Builder tab
    - EBV files for one or more traits
 
 2. Configure analysis parameters:

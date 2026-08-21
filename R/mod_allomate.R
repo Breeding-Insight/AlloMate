@@ -273,7 +273,7 @@ mod_allomate_ui <- function(id) {
             <ul>
               <li>This tool performs mate selection and optimum contribution selection (OCS) for breeding programs.</li>
               <li><strong>Step 1:</strong> Upload your <strong>candidate list</strong> (.csv or .txt) with columns: <code>id</code>, <code>sex</code>.</li>
-              <li><strong>Step 2:</strong> Upload your <strong>pedigree file</strong> (.txt) with columns: <code>id</code>, <code>male_parent</code>, <code>female_parent</code> — or switch the relationship matrix source to upload a precomputed A, G, or H matrix (e.g. built in the <strong>Matrix Builder</strong> tab).</li>
+              <li><strong>Step 2:</strong> Upload your <strong>pedigree file</strong> (.txt) with columns: <code>id</code>, <code>male_parent</code>, <code>female_parent</code> — or switch the relationship matrix source to upload a precomputed A, G, or H matrix built in the <strong>Matrix Builder</strong> tab (G and H matrices additionally require a marker/dosage genotype file: an ID column plus one column per marker, coded 0/1/2 for diploids).</li>
               <li><strong>Step 3:</strong> Optionally adjust the <strong>kinship threshold</strong> to restrict inbred crosses.</li>
               <li><strong>Step 4:</strong> Upload <strong>trait EBV files</strong> and assign weights. Weights must sum to 1.</li>
               <li><strong>Step 5:</strong> Configure OCS parameters and click <strong>Run OCS</strong>.</li>

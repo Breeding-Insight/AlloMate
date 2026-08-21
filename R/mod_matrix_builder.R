@@ -49,6 +49,11 @@ mod_matrix_builder_ui <- function(id) {
             condition = sprintf("input['%s'] == 'G' || input['%s'] == 'H'", ns("matrix_type"), ns("matrix_type")),
             shiny::h6("Genotypes"),
             shiny::fileInput(ns("genotype_file"), "Upload marker/dosage file", accept = c(".csv", ".txt")),
+            shiny::p(
+              "ID column followed by one column per marker, coded as allele dosage
+              (0, 1, 2 for diploids). Leave cells blank for missing genotypes.",
+              style = "color: #6c757d; font-size: 11px; margin-top: -8px; margin-bottom: 10px;"
+            ),
             shiny::selectInput(
               ns("g_method"), "G matrix method",
               choices  = c("VanRaden", "Yang", "Su", "Vitezica"),
@@ -107,6 +112,25 @@ mod_matrix_builder_ui <- function(id) {
             style = "color: #6c757d; font-size: 12px;"
           ),
           DT::DTOutput(ns("matrix_preview"))
+        ),
+        bs4Dash::box(
+          title       = "Instructions",
+          id          = ns("instructions_box"),
+          status      = "info",
+          solidHeader = FALSE,
+          width       = 12,
+          collapsible = TRUE,
+          collapsed   = FALSE,
+          shiny::HTML('
+            <ul>
+              <li>This tool builds a pedigree-based (A), genomic (G), or combined (H) relationship matrix for use in Mate Allocation.</li>
+              <li><strong>Step 1:</strong> Choose a <strong>matrix type</strong> — A, G, or H.</li>
+              <li><strong>Step 2:</strong> Upload the required file(s) — a <strong>pedigree file</strong> (.txt or .csv) for A or H, and/or a <strong>marker/dosage file</strong> (.csv or .txt) for G or H (ID column plus one column per marker, coded 0/1/2 for diploids).</li>
+              <li><strong>Step 3:</strong> Set the <strong>ploidy</strong> and, if relevant, the G/H method, then click <strong>Build Matrix</strong>.</li>
+              <li><strong>Step 4:</strong> Review the <strong>preview and summary</strong> — dimensions, mean diagonal/off-diagonal, and value range.</li>
+              <li><strong>Step 5:</strong> <strong>Download the matrix</strong> as a CSV and upload it in Mate Allocation via the <strong>Upload precomputed matrix (A/G/H)</strong> option.</li>
+            </ul>
+          ')
         )
       )
     )

@@ -178,6 +178,11 @@ help_content_allomate <- function(collapse_fn = NULL, id_prefix = "") {
           A/G/H relationship matrix (diagonal ≈ 1+F); it will be halved automatically to
           the kinship scale used internally. Check the box only if uploading a matrix that is
           already on the kinship (½) scale."
+        ), style = "font-size: 11px; color: #6c757d;"),
+        shiny::p(shiny::HTML(
+          "G and H matrices additionally require genotype (marker/dosage) data — an ID
+          column plus one column per marker, coded 0/1/2 for diploids — uploaded in the
+          <strong>Matrix Builder</strong> tab, which also needs a pedigree file for H."
         ), style = "font-size: 11px; color: #6c757d;")
       )
     ),
