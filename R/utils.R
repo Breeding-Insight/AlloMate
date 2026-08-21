@@ -64,11 +64,18 @@ read_uploaded_table <- function(file, file_type = "file") {
     )
   )
 
+  # Default order favors tab-delimited: pedigree/candidate/EBV .txt files are
+  # documented as tab-separated, and read_table()'s whitespace/fixed-width
+  # column guessing is fragile — it infers column widths from the first rows
+  # it sees, and silently misaligns (without a hard error) once a long run of
+  # narrow values (e.g. founders with parent id "0") is followed by much
+  # wider ones (real parent ids). Kept as a fallback for genuinely
+  # whitespace-delimited files, but tried after the delimited readers.
   ext <- tolower(tools::file_ext(name))
   if (identical(ext, "csv")) {
     readers <- readers[c(3, 2, 1)]
-  } else if (identical(ext, "tsv")) {
-    readers <- readers[c(2, 1, 3)]
+  } else {
+    readers <- readers[c(2, 3, 1)]
   }
 
   first_error <- NULL
@@ -86,6 +93,26 @@ read_uploaded_table <- function(file, file_type = "file") {
       )
 
       if (is.null(df)) next
+
+      # A reader can "succeed" (return a data.frame) while still having
+      # silently misparsed some rows — e.g. read_table()'s column-width
+      # guess turning out wrong partway through the file. readr records
+      # these as problems() without raising an error, so treat any reader
+      # that logged problems as failed and fall through to the next one
+      # rather than returning corrupted data.
+      parse_problems <- tryCatch(readr::problems(df), error = function(e) NULL)
+      if (!is.null(parse_problems) && nrow(parse_problems) > 0) {
+        if (is.null(first_error)) {
+          first_problem <- parse_problems[1, ]
+          first_error <<- sprintf(
+            "%s reader logged %d parsing problem(s) starting at row %s, column '%s' (expected %s, got %s).",
+            reader$label, nrow(parse_problems),
+            first_problem$row, first_problem$col,
+            first_problem$expected, first_problem$actual
+          )
+        }
+        next
+      }
 
       df <- as.data.frame(df, stringsAsFactors = FALSE)
       names(df) <- trimws(sub("^\ufeff", "", names(df)))
