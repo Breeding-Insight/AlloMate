@@ -63,6 +63,11 @@ mod_help_server <- function(id, parent_session = NULL) {
           icon_name = "diagram-project",
           label = "Pedigree Cleaner",
           body_content = help_content_ped_cleaner(collapse_fn = make_collapse_panel, id_prefix = "page")
+        ),
+        make_help_section(
+          icon_name = "table-cells",
+          label = "Matrix Builder",
+          body_content = help_content_matrix_builder(collapse_fn = make_collapse_panel, id_prefix = "page")
         )
       )
     })

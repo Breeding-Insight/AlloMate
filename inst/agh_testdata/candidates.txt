@@ -1,0 +1,9 @@
+id	sex
+C01	M
+C02	F
+C03	M
+C04	F
+C05	M
+C06	F
+C07	M
+C08	F

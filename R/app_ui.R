@@ -52,6 +52,12 @@ app_ui <- function(request) {
           tags$li(
             class = "header",
             style = "color: grey; margin-top: 18px; margin-bottom: 10px; padding-left: 15px;",
+            "Data Preparation"
+          ),
+          bs4Dash::menuItem("Matrix Builder", tabName = "matrix_builder", icon = shiny::icon("table-cells")),
+          tags$li(
+            class = "header",
+            style = "color: grey; margin-top: 18px; margin-bottom: 10px; padding-left: 15px;",
             "Analysis"
           ),
           bs4Dash::menuItem("Mate Allocation", tabName = "allomate", icon = shiny::icon("bullseye")),
@@ -108,8 +114,9 @@ app_ui <- function(request) {
         ),
         bs4Dash::tabItems(
           bs4Dash::tabItem(tabName = "home", mod_Home_ui("Home_1")),
-          bs4Dash::tabItem(tabName = "allomate",    mod_allomate_ui("allomate_1")),
-          bs4Dash::tabItem(tabName = "help",        mod_help_ui("help_1"))
+          bs4Dash::tabItem(tabName = "allomate",       mod_allomate_ui("allomate_1")),
+          bs4Dash::tabItem(tabName = "matrix_builder",  mod_matrix_builder_ui("matrix_builder_1")),
+          bs4Dash::tabItem(tabName = "help",           mod_help_ui("help_1"))
         )
       )
     )

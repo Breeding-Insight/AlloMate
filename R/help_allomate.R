@@ -69,7 +69,9 @@ help_content_allomate <- function(collapse_fn = NULL, id_prefix = "") {
       shiny::tags$li(shiny::HTML(
         "<strong>Upload a pedigree file</strong> — a tab-separated <code>.txt</code> file
         with columns <code>id</code>, <code>male_parent</code>, <code>female_parent</code>.
-        The kinship matrix is computed automatically."
+        The kinship matrix is computed automatically. Alternatively, switch the
+        relationship matrix source to <em>Upload precomputed matrix (A/G/H)</em> to supply
+        a genomic or combined matrix built in the <strong>Matrix Builder</strong> tab."
       )),
       shiny::tags$li(shiny::HTML(
         "<strong>Set the kinship threshold</strong> — crosses with kinship at or above
@@ -158,6 +160,25 @@ help_content_allomate <- function(collapse_fn = NULL, id_prefix = "") {
           cleaned before kinship computation."),
           style = "font-size: 11px; color: #6c757d;"
         )
+      )
+    ),
+
+    collapse_fn(
+      panel_id     = pid("am_help_matrix_upload"),  # <-- prefixed
+      icon_name    = "table-cells",
+      label        = "Precomputed Relationship Matrix (.csv, A/G/H)",
+      body_content = shiny::tagList(
+        shiny::p(
+          "A square CSV with individual IDs as both row and column names — the same
+          format produced by the Matrix Builder tab's download.",
+          style = "margin-bottom: 6px;"
+        ),
+        shiny::p(shiny::HTML(
+          "Leave <em>Values are already kinship coefficients</em> unchecked for a standard
+          A/G/H relationship matrix (diagonal ≈ 1+F); it will be halved automatically to
+          the kinship scale used internally. Check the box only if uploading a matrix that is
+          already on the kinship (½) scale."
+        ), style = "font-size: 11px; color: #6c757d;")
       )
     ),
 
