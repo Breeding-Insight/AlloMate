@@ -69,7 +69,9 @@ help_content_allomate <- function(collapse_fn = NULL, id_prefix = "") {
       shiny::tags$li(shiny::HTML(
         "<strong>Upload a pedigree file</strong> — a tab-separated <code>.txt</code> file
         with columns <code>id</code>, <code>male_parent</code>, <code>female_parent</code>.
-        The kinship matrix is computed automatically."
+        The kinship matrix is computed automatically. Alternatively, switch the
+        relationship matrix source to <em>Upload precomputed matrix (A/G/H)</em> to supply
+        a genomic or combined matrix built in the <strong>Matrix Builder</strong> tab."
       )),
       shiny::tags$li(shiny::HTML(
         "<strong>Set the kinship threshold</strong> — crosses with kinship at or above
@@ -162,6 +164,30 @@ help_content_allomate <- function(collapse_fn = NULL, id_prefix = "") {
     ),
 
     collapse_fn(
+      panel_id     = pid("am_help_matrix_upload"),  # <-- prefixed
+      icon_name    = "table-cells",
+      label        = "Precomputed Relationship Matrix (.csv, A/G/H)",
+      body_content = shiny::tagList(
+        shiny::p(
+          "A square CSV with individual IDs as both row and column names — the same
+          format produced by the Matrix Builder tab's download.",
+          style = "margin-bottom: 6px;"
+        ),
+        shiny::p(shiny::HTML(
+          "Leave <em>Values are already kinship coefficients</em> unchecked for a standard
+          A/G/H relationship matrix (diagonal ≈ 1+F); it will be halved automatically to
+          the kinship scale used internally. Check the box only if uploading a matrix that is
+          already on the kinship (½) scale."
+        ), style = "font-size: 11px; color: #6c757d;"),
+        shiny::p(shiny::HTML(
+          "G and H matrices additionally require genotype (marker/dosage) data — an ID
+          column plus one column per marker, coded 0/1/2 for diploids — uploaded in the
+          <strong>Matrix Builder</strong> tab, which also needs a pedigree file for H."
+        ), style = "font-size: 11px; color: #6c757d;")
+      )
+    ),
+
+    collapse_fn(
       panel_id     = pid("am_help_ebv"),  # <-- prefixed
       icon_name    = "chart-line",
       label        = "Trait EBV File (.csv or .txt, one per trait)",
@@ -185,6 +211,20 @@ help_content_allomate <- function(collapse_fn = NULL, id_prefix = "") {
         Candidates without an EBV for any trait will be excluded from analysis.",
                  style = "font-size: 11px; color: #6c757d;")
       )
+    ),
+
+    shiny::hr(style = "margin: 8px 0;"),
+
+    # ── Tutorial Data ────────────────────────────────────────────────
+    shiny::h6(shiny::tagList(shiny::icon("download"), " Tutorial Data"),
+              style = "font-weight: bold;"),
+    shiny::p("Download a complete example data set for the Mate Allocation workflow.",
+             style = "color: #6c757d; font-size: 12px; margin-bottom: 8px;"),
+    shiny::tags$a(
+      href = "www/tutorial_data.zip",
+      download = "tutorial_data.zip",
+      class = "btn btn-sm btn-outline-danger",
+      shiny::tagList(shiny::icon("download"), " Download Tutorial Data")
     ),
 
     shiny::hr(style = "margin: 8px 0;"),
@@ -225,7 +265,9 @@ help_content_allomate <- function(collapse_fn = NULL, id_prefix = "") {
       body_content = shiny::p(
         "The target rate of inbreeding per generation used by the OCS optimiser. Lower
         values preserve more genetic diversity but may reduce short-term genetic gain.
-        Typical values range from 0.01 to 0.05. Must be greater than 0.",
+        Typical values range from 0.01 to 0.05. Must be greater than 0. If the rate is
+        below the lowest mean kinship your candidates can reach, AlloMate returns the
+        lowest-kinship plan and shows a warning with the kinship actually achieved.",
         style = "font-size: 13px; margin: 0;"
       )
     ),
@@ -241,29 +283,14 @@ help_content_allomate <- function(collapse_fn = NULL, id_prefix = "") {
       )
     ),
     collapse_fn(
-      panel_id     = pid("am_help_greedy"),  # <-- prefixed
+      panel_id     = pid("am_help_pair_kinship"),  # <-- prefixed
       icon_name    = "gear",
-      label        = "Advanced OCS Options (optiSel required)",
-      body_content = shiny::tagList(
-        shiny::p(shiny::HTML("These options are only shown when the <code>optiSel</code> package is available:"),
-                 style = "font-size: 13px; margin-bottom: 6px;"),
-        shiny::tags$ul(
-          style = "font-size: 13px;",
-          shiny::tags$li(shiny::HTML(
-            "<strong>Enforce per-pair kinship threshold</strong> — filters the mating plan
-            so that no allocated pair exceeds the desired inbreeding rate."
-          )),
-          shiny::tags$li(shiny::HTML(
-            "<strong>Use greedy mating (browser-safe)</strong> — replaces the LP-based
-            mating allocator with a greedy heuristic. Use this if the app freezes during
-            large mating plan generation."
-          )),
-          shiny::tags$li(shiny::HTML(
-            "<strong>Bypass quadprog (heuristic contributions)</strong> — skips the
-            quadratic programming solver for contribution optimisation and uses a fast
-            heuristic instead."
-          ))
-        )
+      label        = "Enforce Per-Pair Kinship Threshold (OCS)",
+      body_content = shiny::p(
+        "When checked (the default), the mating plan only pairs mates whose kinship is
+        below the desired inbreeding rate. If no plan can satisfy this, OCS stops with an
+        error; raise the inbreeding rate or uncheck the box to allow closer pairings.",
+        style = "font-size: 13px; margin: 0;"
       )
     ),
 
@@ -280,9 +307,14 @@ help_content_allomate <- function(collapse_fn = NULL, id_prefix = "") {
         crosses that pass the kinship threshold and have a positive index EBV."
       )),
       shiny::tags$li(shiny::HTML(
-        "<strong>Optimum Contribution Selection</strong> — shows the selected candidates
-        with their optimised contributions, and the recommended mating plan with allocated
-        offspring counts."
+        "<strong>OCS</strong> — shows the selected candidates with their optimised
+        contributions from Optimum Contribution Selection."
+      )),
+      shiny::tags$li(shiny::HTML(
+        "<strong>Mate Allocation</strong> — shows the recommended mating plan with
+        allocated offspring counts. Maximize the results panel (expand icon, top-right)
+        for a dashboard view: the Kinship/EBV quantile summary as a full-width header
+        with the OCS and Mate Allocation tables side by side beneath it."
       ))
     ),
 

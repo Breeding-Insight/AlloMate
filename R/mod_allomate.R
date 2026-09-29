@@ -44,8 +44,40 @@ mod_allomate_ui <- function(id) {
           shiny::h6("Estimate progeny genetic merit"),
           shiny::fileInput(ns("candidate_file"), "Upload list of candidates", accept = c(".csv", ".txt")),
           shiny::h6("Calculate kinship matrix"),
-          shiny::fileInput(ns("pedigree_file"), "Upload pedigree file", accept = ".txt"),
-          shiny::uiOutput(ns("pedigree_status_display")),
+          shiny::selectInput(
+            ns("matrix_source"), "Relationship matrix source",
+            choices = c(
+              "Compute A matrix from pedigree"    = "pedigree",
+              "Upload precomputed matrix (A/G/H)" = "upload"
+            ),
+            selected = "pedigree"
+          ),
+          shiny::conditionalPanel(
+            condition = sprintf("input['%s'] == 'pedigree'", ns("matrix_source")),
+            shiny::fileInput(ns("pedigree_file"), "Upload pedigree file", accept = ".txt"),
+            shiny::uiOutput(ns("pedigree_status_display"))
+          ),
+          shiny::conditionalPanel(
+            condition = sprintf("input['%s'] == 'upload'", ns("matrix_source")),
+            shiny::fileInput(
+              ns("relationship_matrix_file"),
+              "Upload relationship matrix (.csv, IDs as row & column names)",
+              accept = c(".csv", ".txt")
+            ),
+            shiny::checkboxInput(
+              ns("matrix_is_kinship"),
+              "Values are already kinship coefficients (½ scale)",
+              value = FALSE
+            ),
+            shiny::p(
+              shiny::HTML(
+                "Leave unchecked for a standard A/G/H relationship matrix
+                (diagonal ≈ 1+F), e.g. from the <strong>Matrix Builder</strong> tab.
+                Check this box if the diagonal is already on the kinship (½) scale."
+              ),
+              style = "color: #6c757d; font-size: 11px; margin-top: 6px;"
+            )
+          ),
           shiny::h6("Set kinship threshold"),
           shiny::numericInput(
             ns("thresh"),
@@ -84,8 +116,6 @@ mod_allomate_ui <- function(id) {
             "Configure breeding objectives and constraints:",
             style = "color: #6c757d; font-size: 12px; margin-bottom: 10px;"
           ),
-          shiny::verbatimTextOutput(ns("package_status_text")),
-          shiny::div(style = "display:none;", shiny::textOutput(ns("ocs_checkbox_mode"))),
           shiny::h6("Breeding Objectives"),
           shiny::numericInput(
             ns("inbreeding_rate"), "Desired Inbreeding Rate",
@@ -95,23 +125,18 @@ mod_allomate_ui <- function(id) {
             ns("num_offspring"), "Number of Offspring",
             value = 100, min = 10, step = 1
           ),
-          shiny::conditionalPanel(
-            condition = sprintf("output['%s'] == '1'", ns("ocs_checkbox_mode")),
-            shiny::checkboxInput(
-              ns("enforce_pair_kinship"),
-              "Enforce per-pair kinship threshold in mating plan",
-              value = TRUE
-            ),
-            shiny::checkboxInput(
-              ns("force_greedy_mating"),
-              "Use greedy mating (browser-safe)",
-              value = isTRUE(getOption("allomate.force_greedy_mating", FALSE))
-            ),
-            shiny::checkboxInput(
-              ns("force_qp_greedy"),
-              "Bypass quadprog (heuristic contributions)",
-              value = isTRUE(getOption("allomate.force_qp_greedy", FALSE))
-            )
+          shiny::numericInput(
+            ns("ocs_seed"), "Random Seed (optional)",
+            value = NA, step = 1
+          ),
+          shiny::p(
+            "For replicable results: leave blank for a different result each run, or set a number to get the same OCS/mating plan every time for the same inputs.",
+            style = "color: #6c757d; font-size: 11px; margin-top: -8px; margin-bottom: 8px;"
+          ),
+          shiny::checkboxInput(
+            ns("enforce_pair_kinship"),
+            "Enforce per-pair kinship threshold in mating plan",
+            value = TRUE
           ),
           shiny::actionButton(ns("run_ocs_btn"), "Run OCS"),
           shiny::hr(),
@@ -122,11 +147,18 @@ mod_allomate_ui <- function(id) {
             style = "border-bottom: 1px solid #dee2e6; padding-bottom: 6px; margin-bottom: 10px;"
           ),
           shiny::p(
-            "Download all results in a single zip file:",
+            "Download the mate allocation plan (with kinship and OCS tabs) as an Excel file:",
             style = "color: #6c757d; font-size: 12px; margin-bottom: 10px;"
           ),
           shinyjs::disabled(
-            downloadButton(ns("download_all_results"), "Download Results")
+            downloadButton(ns("download_mate_allocation"), "Download Mate Allocation")
+          ),
+          shiny::p(
+            "Or download every results table (kinship, EBV matrix, OCS, mating plan, parameters) as a zip of TSV files:",
+            style = "color: #6c757d; font-size: 12px; margin: 10px 0;"
+          ),
+          shinyjs::disabled(
+            downloadButton(ns("download_all_tsv"), "Download All Tables (.zip)")
           ),
           shiny::hr(),
           
@@ -147,46 +179,47 @@ mod_allomate_ui <- function(id) {
         width = 6,
         bs4Dash::box(
           title       = "AlloMate Results",
+          id          = ns("results_box"),
           status      = "info",
-          solidHeader = FALSE,
+          solidHeader = TRUE,
           width       = 12,
           height      = 750,
           maximizable = TRUE,
+          collapsible = TRUE,
+          collapsed   = TRUE,
           bs4Dash::tabsetPanel(
             id   = ns("main_tabs"),
             type = "tabs",
             shiny::tabPanel(
-              "Instructions",
-              shiny::fluidRow(
-                shiny::column(12, shiny::wellPanel(shiny::HTML('
-                  <ul>
-                    <li>This tool performs mate selection and optimum contribution selection (OCS) for breeding programs.</li>
-                    <li><strong>Step 1:</strong> Upload your <strong>candidate list</strong> (.csv or .txt) with columns: <code>id</code>, <code>sex</code>.</li>
-                    <li><strong>Step 2:</strong> Upload your <strong>pedigree file</strong> (.txt) with columns: <code>id</code>, <code>male_parent</code>, <code>female_parent</code>.</li>
-                    <li><strong>Step 3:</strong> Optionally adjust the <strong>kinship threshold</strong> to restrict inbred crosses.</li>
-                    <li><strong>Step 4:</strong> Upload <strong>trait EBV files</strong> and assign weights. Weights must sum to 1.</li>
-                    <li><strong>Step 5:</strong> Configure OCS parameters and click <strong>Run OCS</strong>.</li>
-                    <li>Results are shown in the <strong>Kinship and EBV</strong> and <strong>Optimum Contribution Selection</strong> tabs.</li>
-                    <li>Use <strong>Download Results</strong> to download a zip of all output tables.</li>
-                  </ul>
-                ')))
+              "Kinship and EBV",
+              shiny::br(),
+              shiny::div(
+                class = "kinship-extra",
+                shiny::verbatimTextOutput(ns("message1")),
+                shiny::uiOutput(ns("candidate_ebv_status")),
+                shiny::uiOutput(ns("ebv_upload_prompt")),
+                shiny::uiOutput(ns("message2"))
+              ),
+              shiny::div(
+                class = "kinship-quantiles",
+                shiny::h5("Kinship & EBV Quantiles"),
+                DT::DTOutput(ns("quadrants_table"))
+              ),
+              shiny::div(
+                class = "kinship-extra",
+                DT::DTOutput(ns("matrix"))
               ),
               style = "overflow-y: auto; height: 640px;"
             ),
             shiny::tabPanel(
-              "Kinship and EBV",
+              "OCS",
               shiny::br(),
-              shiny::verbatimTextOutput(ns("message1")),
-              shiny::uiOutput(ns("candidate_ebv_status")),
-              shiny::uiOutput(ns("ebv_upload_prompt")),
-              shiny::uiOutput(ns("message2")),
-              DT::DTOutput(ns("quadrants_table")),
-              DT::DTOutput(ns("matrix")),
-              style = "overflow-y: auto; height: 640px;"
-            ),
-            shiny::tabPanel(
-              "Optimum Contribution Selection",
-              shiny::br(),
+              shiny::p(
+                class = "ocs-maximize-tip",
+                shiny::icon("expand"),
+                " Tip: maximize this panel (top-right icon) to view OCS and Mate Allocation side by side.",
+                style = "color: #6c757d; font-size: 12px; margin: 0 0 8px;"
+              ),
               shiny::div(
                 id    = "ocs_container",
                 style = "position: relative;",
@@ -198,14 +231,41 @@ mod_allomate_ui <- function(id) {
                     shiny::div(class = "ocs-spinner")
                   )
                 ),
-                DT::DTOutput(ns("ocs_candidate_table")),
-                shiny::uiOutput(ns("ocs_solver_note")),
-                shiny::br(),
-                DT::DTOutput(ns("ocs_mating_table"))
+                shiny::h5("Optimal Contributions"),
+                DT::DTOutput(ns("ocs_candidate_table"))
               ),
+              style = "overflow-y: auto; height: 640px;"
+            ),
+            shiny::tabPanel(
+              "Mate Allocation",
+              shiny::br(),
+              shiny::h5("Mating Plan"),
+              DT::DTOutput(ns("ocs_mating_table")),
+              shiny::uiOutput(ns("ocs_solver_note")),
               style = "overflow-y: auto; height: 640px;"
             )
           )
+        ),
+        bs4Dash::box(
+          title       = "Instructions",
+          id          = ns("instructions_box"),
+          status      = "info",
+          solidHeader = FALSE,
+          width       = 12,
+          collapsible = TRUE,
+          collapsed   = FALSE,
+          shiny::HTML('
+            <ul>
+              <li>This tool performs mate selection and optimum contribution selection (OCS) for breeding programs.</li>
+              <li><strong>Step 1:</strong> Upload your <strong>candidate list</strong> (.csv or .txt) with columns: <code>id</code>, <code>sex</code>.</li>
+              <li><strong>Step 2:</strong> Upload your <strong>pedigree file</strong> (.txt) with columns: <code>id</code>, <code>male_parent</code>, <code>female_parent</code> — or switch the relationship matrix source to upload a precomputed A, G, or H matrix built in the <strong>Matrix Builder</strong> tab (G and H matrices additionally require a marker/dosage genotype file: an ID column plus one column per marker, coded 0/1/2 for diploids).</li>
+              <li><strong>Step 3:</strong> Optionally adjust the <strong>kinship threshold</strong> to restrict inbred crosses.</li>
+              <li><strong>Step 4:</strong> Upload <strong>trait EBV files</strong> and assign weights. Weights must sum to 1.</li>
+              <li><strong>Step 5:</strong> Configure OCS parameters and click <strong>Run OCS</strong>.</li>
+              <li>Results are shown in the <strong>Kinship and EBV</strong>, <strong>OCS</strong>, and <strong>Mate Allocation</strong> tabs. Maximize the results panel for a dashboard view: the Kinship/EBV quantile summary as a full-width header with the OCS and Mate Allocation tables side by side beneath it.</li>
+              <li>Use <strong>Download Results</strong> to download a zip of all output tables.</li>
+            </ul>
+          ')
         )
       ), # closes column(width = 6)
       
@@ -236,7 +296,7 @@ mod_allomate_ui <- function(id) {
           collapsible = TRUE,
           collapsed   = FALSE,
           status      = "info",
-          solidHeader = TRUE,
+          solidHeader = FALSE,
           shiny::uiOutput(ns("dynamic_guide"))
         ),
         
@@ -247,7 +307,7 @@ mod_allomate_ui <- function(id) {
           collapsible = TRUE,
           collapsed   = FALSE,
           status      = "info",
-          solidHeader = TRUE,
+          solidHeader = FALSE,
           shiny::htmlOutput(ns("file_status_display"))
         )
       ) # closes column(width = 3)
@@ -277,19 +337,7 @@ mod_allomate_server <- function(id, parent_session) {
     error_message             <- shiny::reactiveVal("")
     pedigree_validation_stats <- shiny::reactiveVal(NULL)
     ebv_data <- shiny::reactive({ process_ebvs(trait_counter(), input) })
-    
-    #### Package status ####
-    output$package_status_text <- shiny::renderText({ generate_package_status() })
-    optisel_available      <- requireNamespace("optiSel", quietly = TRUE)
-    ocs_checkboxes_enabled <- optisel_available
-    output$ocs_checkbox_mode <- shiny::renderText({
-      if (ocs_checkboxes_enabled) "1" else ""
-    })
-    shiny::outputOptions(output, "ocs_checkbox_mode", suspendWhenHidden = FALSE)
-    if (optisel_available) {
-      options(allomate.force_greedy_mating = FALSE, allomate.force_qp_greedy = FALSE)
-    }
-    
+
     #### Candidates ####
     candidates_data <- shiny::reactive({
       shiny::req(input$candidate_file)
@@ -315,90 +363,114 @@ mod_allomate_server <- function(id, parent_session) {
       })
     })
     
-    #### Pedigree ####
+    #### Pedigree / relationship matrix ####
     pedigree_data <- shiny::reactiveVal(NULL)
-    shiny::observeEvent(input$pedigree_file, {
-      shiny::req(candidates_data())
-      males   <- candidates_data()$males
-      females <- candidates_data()$females
-      shinyWidgets::updateProgressBar(
-        session = session, id = "pb_allomate",
-        value = 40, status = "info", title = "Processing pedigree..."
-      )
-      tryCatch({
-        raw_ped <- readr::read_table(input$pedigree_file$datapath)
-        required_cols <- c("id", "male_parent", "female_parent")
-        missing_cols  <- setdiff(required_cols, colnames(raw_ped))
-        if (length(missing_cols) > 0) {
-          stop(paste0(
-            "Missing required column(s): ",
-            paste(missing_cols, collapse = ", "),
-            ". File must contain: id, male_parent, female_parent."
-          ))
-        }
-        cleaned_ped <- clean_pedigree(raw_ped, return_stats = TRUE)
-        final_ped   <- cleaned_ped$pedigree
-        candidate_ids         <- candidates_data()$candidates$id
-        pedigree_ids          <- as.character(raw_ped$id)
-        missing_candidate_ids <- setdiff(candidate_ids, pedigree_ids)
-        missing_candidates    <- length(missing_candidate_ids)
-        missing_male_ids      <- intersect(missing_candidate_ids, males)
-        missing_female_ids    <- intersect(missing_candidate_ids, females)
-        remaining_missing_ids <- setdiff(missing_candidate_ids, c(missing_male_ids, missing_female_ids))
-        cleaned_ped$stats$missing_candidates    <- missing_candidates
-        cleaned_ped$stats$missing_candidate_ids <- missing_candidate_ids
-        kinship_res <- compute_kinship_matrix(final_ped, males, females)
-        output$quadrants_table <- DT::renderDT({
-          DT::datatable(kinship_res$quads,
-                        options = list(ordering = FALSE, dom = "t"), rownames = TRUE) %>%
-            DT::formatStyle(colnames(kinship_res$quads),
-                            styleEqual(kinship_res$quads[1, ],
-                                       c("lightgreen", "yellow", "orange", "coral")))
-        })
-        pedigree_data(list(results = kinship_res$results, quads = kinship_res$quads))
-        pedigree_validation_stats(cleaned_ped$stats)
-        error_message("")
-        format_missing_msg <- function(ids, label) {
-          if (length(ids) == 0) return(NULL)
-          ids_str <- format_id_list(ids)
-          plural  <- if (length(ids) == 1) "" else "s"
-          if (ids_str != "") {
-            paste0(length(ids), " ", label, plural,
-                   " missing from pedigree and not visualized (IDs: ", ids_str, ").")
-          } else {
-            paste0(length(ids), " ", label, plural,
-                   " missing from pedigree and not visualized.")
-          }
-        }
-        kinship_mismatch_msgs <- unlist(Filter(Negate(is.null), list(
-          format_missing_msg(missing_male_ids,   "male candidate"),
-          format_missing_msg(missing_female_ids, "female candidate"),
-          format_missing_msg(remaining_missing_ids, "candidate")
-        )))
-        kinship_status <- if (length(kinship_mismatch_msgs) == 0) {
-          "Kinship matrix generated successfully."
+    kinship_matrix_reactive <- shiny::reactiveVal(NULL)
+
+    shiny::observeEvent(
+      list(input$matrix_source, input$pedigree_file, input$relationship_matrix_file, input$matrix_is_kinship),
+      {
+        shiny::req(candidates_data())
+        source_type <- input$matrix_source %||% "pedigree"
+        if (identical(source_type, "pedigree")) {
+          shiny::req(input$pedigree_file)
         } else {
-          paste("Kinship matrix generated with warnings.",
-                paste(kinship_mismatch_msgs, collapse = " "))
+          shiny::req(input$relationship_matrix_file)
         }
-        output$message1 <- shiny::renderText(kinship_status)
+        males   <- candidates_data()$males
+        females <- candidates_data()$females
         shinyWidgets::updateProgressBar(
           session = session, id = "pb_allomate",
-          value = 60, status = "info", title = "Kinship matrix ready. Waiting for EBVs..."
+          value = 40, status = "info",
+          title = if (identical(source_type, "pedigree")) "Processing pedigree..." else "Processing uploaded matrix..."
         )
-      }, error = function(e) {
-        error_message(paste0("Error processing pedigree: ", e$message))
-        pedigree_validation_stats(NULL)
-        output$message1 <- shiny::renderText(
-          paste0("Error processing pedigree: Make sure your pedigree file has columns id, male_parent, female_parent and is clean and valid.\n",
-                 "Original error: ", e$message)
-        )
-        shinyWidgets::updateProgressBar(
-          session = session, id = "pb_allomate",
-          value = 40, status = "danger", title = "Failed to process pedigree"
-        )
-      })
-    })
+        tryCatch({
+          resolved <- resolve_kinship_input(
+            source            = source_type,
+            pedigree_file     = input$pedigree_file,
+            matrix_file       = input$relationship_matrix_file,
+            matrix_is_kinship = input$matrix_is_kinship
+          )
+          kinship_matrix_reactive(resolved$kinship_matrix)
+
+          candidate_ids         <- candidates_data()$candidates$id
+          available_ids         <- rownames(resolved$kinship_matrix)
+          missing_candidate_ids <- setdiff(candidate_ids, available_ids)
+          missing_candidates    <- length(missing_candidate_ids)
+          missing_male_ids      <- intersect(missing_candidate_ids, males)
+          missing_female_ids    <- intersect(missing_candidate_ids, females)
+          remaining_missing_ids <- setdiff(missing_candidate_ids, c(missing_male_ids, missing_female_ids))
+
+          stats <- resolved$stats
+          if (!is.null(stats)) {
+            stats$missing_candidates    <- missing_candidates
+            stats$missing_candidate_ids <- missing_candidate_ids
+          }
+
+          kinship_res <- summarize_kinship_matrix(resolved$kinship_matrix, males, females)
+          output$quadrants_table <- DT::renderDT({
+            DT::datatable(kinship_res$quads,
+                          options = list(ordering = FALSE, dom = "t"), rownames = TRUE) %>%
+              DT::formatStyle(colnames(kinship_res$quads),
+                              styleEqual(kinship_res$quads[1, ],
+                                         c("lightgreen", "yellow", "orange", "coral")))
+          })
+          # Always compute so it can populate the maximized dashboard header even
+          # if the Kinship and EBV tab has not been opened.
+          shiny::outputOptions(output, "quadrants_table", suspendWhenHidden = FALSE)
+          pedigree_data(list(results = kinship_res$results, quads = kinship_res$quads))
+          pedigree_validation_stats(stats)
+          error_message("")
+          format_missing_msg <- function(ids, label) {
+            if (length(ids) == 0) return(NULL)
+            ids_str <- format_id_list(ids)
+            plural  <- if (length(ids) == 1) "" else "s"
+            noun    <- if (identical(source_type, "pedigree")) "pedigree" else "uploaded matrix"
+            if (ids_str != "") {
+              paste0(length(ids), " ", label, plural,
+                     " missing from ", noun, " and not visualized (IDs: ", ids_str, ").")
+            } else {
+              paste0(length(ids), " ", label, plural,
+                     " missing from ", noun, " and not visualized.")
+            }
+          }
+          kinship_mismatch_msgs <- unlist(Filter(Negate(is.null), list(
+            format_missing_msg(missing_male_ids,   "male candidate"),
+            format_missing_msg(missing_female_ids, "female candidate"),
+            format_missing_msg(remaining_missing_ids, "candidate")
+          )))
+          kinship_status <- if (length(kinship_mismatch_msgs) == 0) {
+            "Kinship matrix generated successfully."
+          } else {
+            paste("Kinship matrix generated with warnings.",
+                  paste(kinship_mismatch_msgs, collapse = " "))
+          }
+          output$message1 <- shiny::renderText(kinship_status)
+          shinyWidgets::updateProgressBar(
+            session = session, id = "pb_allomate",
+            value = 60, status = "info", title = "Kinship matrix ready. Waiting for EBVs..."
+          )
+        }, error = function(e) {
+          error_message(paste0("Error processing pedigree: ", e$message))
+          pedigree_validation_stats(NULL)
+          kinship_matrix_reactive(NULL)
+          fallback_msg <- if (identical(source_type, "pedigree")) {
+            "Make sure your pedigree file has columns id, male_parent, female_parent and is clean and valid."
+          } else {
+            "Make sure your matrix file is a square CSV with individual IDs as both row and column names."
+          }
+          output$message1 <- shiny::renderText(
+            paste0("Error processing pedigree: ", fallback_msg, "\n",
+                   "Original error: ", e$message)
+          )
+          shinyWidgets::updateProgressBar(
+            session = session, id = "pb_allomate",
+            value = 40, status = "danger", title = "Failed to process pedigree"
+          )
+        })
+      },
+      ignoreInit = TRUE
+    )
     
     shiny::observe({
       if (is.null(ebv_data())) {
@@ -494,6 +566,7 @@ mod_allomate_server <- function(id, parent_session) {
           DT::formatStyle("Q75",  backgroundColor = "yellow") %>%
           DT::formatStyle("Q100", backgroundColor = "lightgreen")
       })
+      shiny::outputOptions(output, "quadrants_table", suspendWhenHidden = FALSE)
       filt_results_table <- full_results %>%
         dplyr::filter(EBV > 0, (is.na(Kinship) | Kinship < input$thresh))
       filt_results_matrix <- full_results %>%
@@ -582,73 +655,130 @@ mod_allomate_server <- function(id, parent_session) {
         writeLines(lines, con = file)
       }
     )
-    
+
+    #### Download mate allocation (single xlsx: Mate Allocation / Kinship / OCS) ####
+    output$download_mate_allocation <- shiny::downloadHandler(
+      filename = function() paste0("AlloMate_mate_allocation-", Sys.Date(), ".xlsx"),
+      content  = function(file) {
+        shiny::req(ebv_results_reactive(), ocs_results_reactive())
+
+        fmt <- format_ocs_results(ocs_results_reactive())
+
+        sheets <- list(
+          "Mate Allocation" = as.data.frame(fmt$mating_table),
+          "Kinship"         = as.data.frame(ebv_results_reactive()$filt_results_table),
+          "OCS"             = as.data.frame(fmt$candidate_table)
+        )
+
+        save_xlsx_with_fallback(file, sheets, active_sheet = "Mate Allocation")
+      },
+      contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+    #### Download all tables (zip of TSVs) ####
+    output$download_all_tsv <- shiny::downloadHandler(
+      filename = function() paste0("AlloMate_results-", Sys.Date(), ".zip"),
+      content  = function(file) {
+        shiny::req(ebv_results_reactive())
+        tmp_dir <- tempfile("allomate_export")
+        dir.create(tmp_dir)
+        on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
+
+        # README
+        readme_text <- c(
+          "AlloMate Complete Results Report", "",
+          "This TSV collection contains all results from your AlloMate analysis:", "",
+          "Files included:",
+          "1. README - This overview and explanation",
+          "2. Filtered Results - Crosses meeting criteria (positive EBVs, kinship below threshold)",
+          "3. EBV Matrix - Complete matrix view with masked values",
+          "4. OCS Candidates - Selected candidates from Optimum Contribution Selection",
+          "5. Mating Plan - Recommended mating pairs from OCS",
+          "6. Parameters - Analysis parameters used", "",
+          "Generated on:", as.character(Sys.Date())
+        )
+        write.table(data.frame(Text = readme_text, stringsAsFactors = FALSE),
+                    file.path(tmp_dir, "README.tsv"), sep = "\t", row.names = FALSE, quote = FALSE)
+
+        # Filtered results and EBV matrix
+        ebv_results <- ebv_results_reactive()
+        if (!is.null(ebv_results)) {
+          write.table(as.data.frame(ebv_results$filt_results_table),
+                      file.path(tmp_dir, "Filtered_Results.tsv"),
+                      sep = "\t", row.names = FALSE, quote = FALSE)
+
+          m_ids       <- unique(ebv_results$full_results$Male)
+          f_ids       <- unique(ebv_results$full_results$Female)
+          mat_for_csv <- matrix(NA_real_, nrow = length(m_ids), ncol = length(f_ids),
+                                dimnames = list(m_ids, f_ids))
+          for (i in seq_len(nrow(ebv_results$filt_results_matrix))) {
+            m <- ebv_results$filt_results_matrix$Male[i]
+            f <- ebv_results$filt_results_matrix$Female[i]
+            v <- ebv_results$filt_results_matrix$EBV[i]
+            if (!is.na(m) && !is.na(f) &&
+                m %in% rownames(mat_for_csv) && f %in% colnames(mat_for_csv))
+              mat_for_csv[m, f] <- v
+          }
+          ebv_matrix_df <- data.frame(Male = rownames(mat_for_csv), mat_for_csv,
+                                      check.names = FALSE, stringsAsFactors = FALSE)
+          write.table(ebv_matrix_df, file.path(tmp_dir, "EBV_Matrix.tsv"),
+                      sep = "\t", row.names = FALSE, quote = FALSE, na = "")
+        }
+
+        # OCS results
+        if (!is.null(ocs_results_reactive())) {
+          formatted_results <- tryCatch(format_ocs_results(ocs_results_reactive()), error = function(e) NULL)
+          if (!is.null(formatted_results)) {
+            write.table(as.data.frame(formatted_results$candidate_table),
+                        file.path(tmp_dir, "OCS_Candidates.tsv"),
+                        sep = "\t", row.names = FALSE, quote = FALSE)
+            write.table(as.data.frame(formatted_results$mating_table),
+                        file.path(tmp_dir, "Mating_Plan.tsv"),
+                        sep = "\t", row.names = FALSE, quote = FALSE)
+          }
+        }
+
+        # Parameters
+        achieved_kinship <- ocs_results_reactive()$kinship$achieved
+        write.table(
+          data.frame(
+            Parameter = c("Analysis Date", "Kinship Threshold", "Desired Inbreeding Rate", "Achieved Mean Kinship (OCS)",
+                          "Number of Offspring", "Random Seed"),
+            Value     = c(as.character(Sys.Date()), input$thresh, input$inbreeding_rate,
+                          if (is.null(achieved_kinship)) "Not run" else round(achieved_kinship, 4),
+                          input$num_offspring,
+                          if (!is.null(input$ocs_seed) && !is.na(input$ocs_seed)) input$ocs_seed else "Not set (random)")
+          ),
+          file.path(tmp_dir, "Parameters.tsv"), sep = "\t", row.names = FALSE, quote = FALSE
+        )
+
+        zip_files <- list.files(tmp_dir)
+        zip::zip(zipfile = file, files = zip_files, root = tmp_dir)
+      },
+      contentType = "application/zip"
+    )
+
     #### Pedigree status display ####
     output$pedigree_status_display <- shiny::renderUI({
-      stats <- pedigree_validation_stats()
-      if (is.null(stats)) return(NULL)
-      get_count    <- function(val) if (is.null(val) || is.na(val)) 0L else as.integer(val)
-      format_count <- function(val) format(get_count(val), big.mark = ",", scientific = FALSE)
-      records        <- format_count(stats$records_loaded)
-      unknown_count  <- get_count(stats$unknown_parent_count)
-      circular_count <- get_count(stats$circular_reference_count)
-      missing_count  <- get_count(stats$missing_candidates)
-      duplicates     <- get_count(stats$duplicates_removed)
-      green_box <- paste0(
-        "<div style='background-color: #d4edda; border: 1px solid #c3e6cb; padding: 8px;",
-        " border-radius: 3px; margin-top: 10px; font-size: 12px;'>",
-        records, " records loaded</div>"
-      )
-      yellow_warnings <- c()
-      if (unknown_count > 0) yellow_warnings <- c(yellow_warnings,
-                                                  paste0("<p style='margin:", if (length(yellow_warnings) == 0) "0" else "4px 0 0", ";'>",
-                                                         format_count(stats$unknown_parent_count),
-                                                         " individuals with unknown parent(s) (treated as founders)</p>"))
-      if (circular_count > 0) yellow_warnings <- c(yellow_warnings,
-                                                   paste0("<p style='margin:", if (length(yellow_warnings) == 0) "0" else "4px 0 0", ";'>",
-                                                          format_count(stats$circular_reference_count),
-                                                          " circular references detected and broken at earliest generation</p>"))
-      if (missing_count > 0) yellow_warnings <- c(yellow_warnings,
-                                                  paste0("<p style='margin:", if (length(yellow_warnings) == 0) "0" else "4px 0 0", ";'>",
-                                                         format_count(stats$missing_candidates),
-                                                         " selection candidates missing from pedigree</p>"))
-      yellow_box <- if (length(yellow_warnings) > 0) {
-        paste0(
-          "<div style='background-color: #fff3cd; border: 1px solid #ffeeba; padding: 8px;",
-          " border-radius: 3px; margin-top: 6px; font-size: 12px;'>",
-          paste(yellow_warnings, collapse = ""), "</div>"
-        )
-      } else ""
-      red_box <- if (duplicates > 0) {
-        paste0(
-          "<div style='background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 8px;",
-          " border-radius: 3px; margin-top: 6px; font-size: 12px;'>",
-          format(duplicates, big.mark = ",", scientific = FALSE), " duplicates removed</div>"
-        )
-      } else ""
-      shiny::HTML(paste0(green_box, yellow_box, red_box))
+      render_pedigree_status_html(pedigree_validation_stats())
     })
     
     #### OCS server logic ####
-    shiny::observeEvent(input$force_greedy_mating, {
-      if (!ocs_checkboxes_enabled) return(NULL)
-      options(allomate.force_greedy_mating = isTRUE(input$force_greedy_mating))
-    }, ignoreNULL = FALSE)
-    
-    shiny::observeEvent(input$force_qp_greedy, {
-      if (!ocs_checkboxes_enabled) return(NULL)
-      options(allomate.force_qp_greedy = isTRUE(input$force_qp_greedy))
-    }, ignoreNULL = FALSE)
-    
     shiny::observeEvent(input$run_ocs_btn, {
-      shiny::req(input$pedigree_file, input$candidate_file)
-      shinyjs::disable("download_all_results")
-      if (ocs_checkboxes_enabled) {
-        options(allomate.force_greedy_mating = isTRUE(input$force_greedy_mating))
-        options(allomate.force_qp_greedy     = isTRUE(input$force_qp_greedy))
+      shiny::req(input$candidate_file)
+      matrix_source_now <- input$matrix_source %||% "pedigree"
+      if (identical(matrix_source_now, "pedigree")) {
+        shiny::req(input$pedigree_file)
       } else {
-        options(allomate.force_greedy_mating = FALSE, allomate.force_qp_greedy = FALSE)
+        shiny::req(input$relationship_matrix_file)
       }
+      # Switch to the results view: expand the Results box, collapse Instructions.
+      if (isTRUE(input$results_box$collapsed))
+        bs4Dash::updateBox("results_box", action = "toggle", session = session)
+      if (isFALSE(input$instructions_box$collapsed))
+        bs4Dash::updateBox("instructions_box", action = "toggle", session = session)
+      shinyjs::disable("download_mate_allocation")
+      shinyjs::disable("download_all_tsv")
       shinyjs::show("ocs_loading")
       on.exit(shinyjs::hide("ocs_loading"), add = TRUE)
       shinyWidgets::updateProgressBar(
@@ -656,32 +786,28 @@ mod_allomate_server <- function(id, parent_session) {
         value = 82, status = "info", title = "Reading input files..."
       )
       tryCatch({
-        ped_data   <- read.table(input$pedigree_file$datapath, header = TRUE, stringsAsFactors = FALSE)
-        candidates <- read.table(input$candidate_file$datapath, header = TRUE, stringsAsFactors = FALSE)
-        required_cols <- c("id", "male_parent", "female_parent")
-        missing_cols  <- setdiff(required_cols, colnames(ped_data))
-        if (length(missing_cols) > 0) {
-          stop(paste0(
-            "Missing required column(s): ",
-            paste(missing_cols, collapse = ", "),
-            ". File must contain: id, male_parent, female_parent."
-          ))
-        }
-        final_ped  <- clean_pedigree(ped_data)
+        candidates <- candidates_data()$candidates
         shinyWidgets::updateProgressBar(
           session = session, id = "pb_allomate",
-          value = 87, status = "info", title = "Computing kinship matrix..."
+          value = 87, status = "info",
+          title = if (identical(matrix_source_now, "pedigree")) "Computing kinship matrix..." else "Reading uploaded relationship matrix..."
         )
-        kinship_matrix <- if (requireNamespace("kinship2", quietly = TRUE)) {
-          kinship2::kinship(final_ped)
-        } else {
-          fallback_kinship(final_ped)
-        }
+        resolved <- resolve_kinship_input(
+          source            = matrix_source_now,
+          pedigree_file     = input$pedigree_file,
+          matrix_file       = input$relationship_matrix_file,
+          matrix_is_kinship = input$matrix_is_kinship
+        )
+        kinship_matrix <- resolved$kinship_matrix
         ebv_result <- process_ebvs(trait_counter(), input)
         if (is.null(ebv_result) || abs(ebv_result$weight_total - 1) > 1e-6) {
           shiny::showModal(shiny::modalDialog(
             title = "Invalid Weights", "Weights must sum to 1.", easyClose = TRUE
           ))
+          shinyWidgets::updateProgressBar(
+            session = session, id = "pb_allomate",
+            value = 100, status = "danger", title = "Failed: weights must sum to 1"
+          )
           return(NULL)
         }
         joint_ebvs           <- calculate_index(ebv_result$joint_ebvs, ebv_result$rel_weights)
@@ -711,37 +837,49 @@ mod_allomate_server <- function(id, parent_session) {
           session = session, id = "pb_allomate",
           value = 93, status = "info", title = "Running OCS optimisation..."
         )
+        if (!is.null(input$ocs_seed) && !is.na(input$ocs_seed)) {
+          set.seed(input$ocs_seed)
+        }
         results <- run_ocs(
           candidates_df           = candidates_filtered,
           kinship_matrix          = kinship_matrix,
           ebv_index               = candidates_filtered$index_val,
           desired_inbreeding_rate = input$inbreeding_rate,
           num_offspring           = input$num_offspring,
-          per_pair_kinship_limit  = if (ocs_checkboxes_enabled && isTRUE(input$enforce_pair_kinship))
+          per_pair_kinship_limit  = if (isTRUE(input$enforce_pair_kinship))
             input$inbreeding_rate else NULL
         )
+        if (!isTRUE(results$kinship$target_met)) {
+          shiny::showNotification(
+            sprintf(paste0("OCS: the desired inbreeding rate (%.3f) cannot be reached with these candidates. ",
+                           "Showing the lowest-kinship plan instead (mean kinship %.4f)."),
+                    results$kinship$target, results$kinship$achieved),
+            type = "warning", duration = 12
+          )
+        }
         mating_info <- attr(results$Mating, "info")
         if (!is.null(mating_info) && is.character(mating_info) &&
             grepl("Greedy allocation", mating_info, fixed = TRUE)) {
           shiny::showNotification(
-            paste0("OCS fallback: ", mating_info,
+            paste0("Mate allocation: ", mating_info,
                    ". lpSolve solution could not be used, so a greedy mating plan was generated."),
             type = "warning", duration = 10
           )
         }
         ocs_results_reactive(results)
         error_message("")
-        shinyjs::enable("download_all_results")
+        shinyjs::enable("download_mate_allocation")
+        shinyjs::enable("download_all_tsv")
         formatted_results <- format_ocs_results(results)
         output$ocs_candidate_table <- DT::renderDT({
           DT::datatable(formatted_results$candidate_table,
-                        options = list(pageLength = 10, autoWidth = TRUE), rownames = FALSE)
+                        options = list(pageLength = 20, autoWidth = TRUE), rownames = FALSE)
         })
         shinyWidgets::updateProgressBar(
           session = session, id = "pb_allomate",
           value = 100, status = "success", title = "Finished"
         )
-        shiny::updateTabsetPanel(session, "main_tabs", selected = "Optimum Contribution Selection")
+        shiny::updateTabsetPanel(session, "main_tabs", selected = "Kinship and EBV")
       }, error = function(e) {
         error_message(paste0("Error running OCS: ", e$message))
         shiny::showModal(shiny::modalDialog(
@@ -760,102 +898,32 @@ mod_allomate_server <- function(id, parent_session) {
       shiny::req(ocs_results_reactive())
       formatted_results <- format_ocs_results(ocs_results_reactive())
       mating_tbl <- formatted_results$mating_table
-      if (ocs_checkboxes_enabled && isTRUE(input$enforce_pair_kinship)) {
+      if (isTRUE(input$enforce_pair_kinship)) {
         mating_tbl <- mating_tbl %>%
           dplyr::filter(is.na(Kinship) | Kinship < input$inbreeding_rate)
       }
-      DT::datatable(mating_tbl, options = list(pageLength = 10, autoWidth = TRUE), rownames = FALSE)
+      DT::datatable(mating_tbl, options = list(pageLength = 20, autoWidth = TRUE), rownames = FALSE)
     })
     
     output$ocs_solver_note <- shiny::renderUI({
       shiny::req(ocs_results_reactive())
-      info <- format_ocs_results(ocs_results_reactive())$summary_stats$mating_info
-      if (is.null(info) || is.na(info) || info == "") return(NULL)
+      stats <- format_ocs_results(ocs_results_reactive())$summary_stats
+      info  <- stats$mating_info
+      notes <- c(
+        if (!is.null(info) && !is.na(info) && info != "") info,
+        if (isFALSE(stats$kinship_target_met))
+          sprintf("Desired inbreeding rate %.3f is below the lowest mean kinship these candidates can reach; showing the lowest-kinship plan (mean kinship %.4f).",
+                  stats$target_kinship, stats$achieved_kinship)
+      )
+      if (length(notes) == 0) return(NULL)
       shiny::div(
         style = "margin: 10px 0; padding: 10px; background-color: #fff8e1; border-left: 4px solid #ffb300; font-size: 13px;",
-        shiny::tags$strong("Solver note: "), info
+        shiny::tags$strong("Solver note: "),
+        do.call(shiny::tagList, lapply(notes, shiny::tags$div))
       )
     })
-    
-    #### Download Results ####
-    output$download_all_results <- shiny::downloadHandler(
-      filename = function() paste0("AlloMate_results-", Sys.Date(), ".zip"),
-      content  = function(file) {
-        shiny::req(ebv_results_reactive())
-        tmp_dir <- tempfile("allomate_export")
-        dir.create(tmp_dir)
-        on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
-        
-        # README
-        readme_text <- c(
-          "AlloMate Complete Results Report", "",
-          "This TSV collection contains all results from your AlloMate analysis:", "",
-          "Files included:",
-          "1. README - This overview and explanation",
-          "2. Filtered Results - Crosses meeting criteria (positive EBVs, kinship below threshold)",
-          "3. EBV Matrix - Complete matrix view with masked values",
-          "4. OCS Candidates - Selected candidates from Optimum Contribution Selection",
-          "5. Mating Plan - Recommended mating pairs from OCS",
-          "6. Parameters - Analysis parameters used", "",
-          "Generated on:", as.character(Sys.Date())
-        )
-        write.table(data.frame(Text = readme_text, stringsAsFactors = FALSE),
-                    file.path(tmp_dir, "README.tsv"), sep = "\t", row.names = FALSE, quote = FALSE)
-        
-        # Filtered results and EBV matrix
-        ebv_results <- ebv_results_reactive()
-        if (!is.null(ebv_results)) {
-          write.table(as.data.frame(ebv_results$filt_results_table),
-                      file.path(tmp_dir, "Filtered_Results.tsv"),
-                      sep = "\t", row.names = FALSE, quote = FALSE)
-          
-          m_ids       <- unique(ebv_results$full_results$Male)
-          f_ids       <- unique(ebv_results$full_results$Female)
-          mat_for_csv <- matrix(NA_real_, nrow = length(m_ids), ncol = length(f_ids),
-                                dimnames = list(m_ids, f_ids))
-          for (i in seq_len(nrow(ebv_results$filt_results_matrix))) {
-            m <- ebv_results$filt_results_matrix$Male[i]
-            f <- ebv_results$filt_results_matrix$Female[i]
-            v <- ebv_results$filt_results_matrix$EBV[i]
-            if (!is.na(m) && !is.na(f) &&
-                m %in% rownames(mat_for_csv) && f %in% colnames(mat_for_csv))
-              mat_for_csv[m, f] <- v
-          }
-          ebv_matrix_df <- data.frame(Male = rownames(mat_for_csv), mat_for_csv,
-                                      check.names = FALSE, stringsAsFactors = FALSE)
-          write.table(ebv_matrix_df, file.path(tmp_dir, "EBV_Matrix.tsv"),
-                      sep = "\t", row.names = FALSE, quote = FALSE, na = "")
-        }
-        
-        # OCS results
-        if (!is.null(ocs_results_reactive())) {
-          formatted_results <- tryCatch(format_ocs_results(ocs_results_reactive()), error = function(e) NULL)
-          if (!is.null(formatted_results)) {
-            write.table(as.data.frame(formatted_results$candidate_table),
-                        file.path(tmp_dir, "OCS_Candidates.tsv"),
-                        sep = "\t", row.names = FALSE, quote = FALSE)
-            write.table(as.data.frame(formatted_results$mating_table),
-                        file.path(tmp_dir, "Mating_Plan.tsv"),
-                        sep = "\t", row.names = FALSE, quote = FALSE)
-          }
-        }
-        
-        # Parameters
-        write.table(
-          data.frame(
-            Parameter = c("Analysis Date", "Kinship Threshold", "Desired Inbreeding Rate", "Number of Offspring"),
-            Value     = c(as.character(Sys.Date()), input$thresh, input$inbreeding_rate, input$num_offspring)
-          ),
-          file.path(tmp_dir, "Parameters.tsv"), sep = "\t", row.names = FALSE, quote = FALSE
-        )
-        
-        zip_files <- list.files(tmp_dir)
-        zip::zip(zipfile = file, files = zip_files, root = tmp_dir)
-      },
-      contentType = "application/zip"
-    )
-    
-    #### Startup ####
+
+    #### Getting Started (dynamic step guide) ####
     output$dynamic_guide <- shiny::renderUI({
       current_error <- error_message()
       if (current_error != "") {
@@ -868,7 +936,11 @@ mod_allomate_server <- function(id, parent_session) {
         )))
       }
       has_candidates  <- !is.null(input$candidate_file)
-      has_pedigree    <- !is.null(input$pedigree_file)
+      has_pedigree    <- if (identical(input$matrix_source %||% "pedigree", "upload")) {
+        !is.null(input$relationship_matrix_file)
+      } else {
+        !is.null(input$pedigree_file)
+      }
       has_traits      <- trait_counter() > 0 &&
         any(sapply(seq_len(trait_counter()), function(i) !is.null(input[[paste0("trait_file_", i)]])))
       has_ocs_results <- !is.null(ocs_results_reactive())
@@ -890,7 +962,7 @@ mod_allomate_server <- function(id, parent_session) {
       steps <- c(
         sprintf("<p>%s <strong>Step 1:</strong> Upload your candidate list to begin the analysis</p>",
                 get_step_label(candidate_ready, candidate_error_flag)),
-        sprintf("<p>%s <strong>Step 2:</strong> Upload your pedigree file for kinship calculations</p>",
+        sprintf("<p>%s <strong>Step 2:</strong> Upload your pedigree file (or a precomputed A/G/H matrix) for kinship calculations</p>",
                 get_step_label(has_pedigree, pedigree_error)),
         sprintf("<p>%s <strong>Step 3:</strong> Set your kinship threshold (optional)</p>",
                 get_step_label(has_pedigree, FALSE)),
@@ -900,18 +972,23 @@ mod_allomate_server <- function(id, parent_session) {
                 get_step_label(has_ocs_results, ocs_error))
       )
       if (has_ocs_results) {
-        steps <- c(steps,
-                   "<p><strong>Analysis Complete!</strong></p>",
-                   "<p style='color: #28a745; font-weight: bold;'>Results are ready for review and export.</p>"
+        steps <- c(
+          steps,
+          "<p><strong>Analysis Complete!</strong></p>",
+          "<p style='color: #28a745; font-weight: bold;'>Results are ready for review and export.</p>"
         )
       }
       shiny::HTML(paste(steps, collapse = ""))
     })
-    
+
     #### File status display ####
     output$file_status_display <- shiny::renderUI({
       has_candidates <- !is.null(input$candidate_file)
-      has_pedigree   <- !is.null(input$pedigree_file)
+      has_pedigree   <- if (identical(input$matrix_source %||% "pedigree", "upload")) {
+        !is.null(input$relationship_matrix_file)
+      } else {
+        !is.null(input$pedigree_file)
+      }
       has_ebv        <- !is.null(ebv_results_reactive())
       has_ocs        <- !is.null(ocs_results_reactive())
       current_error  <- error_message()
@@ -979,7 +1056,7 @@ mod_allomate_server <- function(id, parent_session) {
         download_status
       ))
     })
-    
+
     #### Help button ####
     shiny::observeEvent(input$help_btn, {
       shiny::showModal(
@@ -992,6 +1069,5 @@ mod_allomate_server <- function(id, parent_session) {
         )
       )
     })
-    
-  }) # closes moduleServer
-} # closes mod_allomate_server
+  })
+}

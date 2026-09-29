@@ -1,6 +1,6 @@
 Package: AlloMate
 Title: Genetic Mate Allocation and Breeding Optimization Shiny App
-Version: 2.1.0
+Version: 2.2.0
 Authors@R: c(
   person("Josue",                 "Chinchilla-Vargas",
          role = c("aut", "cre"),
@@ -34,9 +34,9 @@ Imports:
     quadprog
 Encoding: UTF-8
 LazyData: true
-Suggests: 
+Suggests:
     testthat (>= 3.0.0),
     kinship2,
-    optiSel
+    AGHmatrix
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.0.0

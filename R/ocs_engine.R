@@ -1,7 +1,9 @@
-# Custom OCS Implementation Functions
-# Note: All required packages are loaded in global.R
+# OCS engine
+# Pure-R Optimum Contribution Selection: quadprog for optimal contributions,
+# lpSolve (with a greedy backup) for mate allocation. run_ocs() in
+# ocs_helpers.R is the entrypoint.
 
-#' Create candidate object similar to candes
+#' Build the OCS candidate object
 #' @importFrom dplyr filter
 #' @importFrom magrittr %>%
 #' 
@@ -11,7 +13,7 @@
 #' 
 #' @return Object of class 'custom_candes'
 custom_candes <- function(phen, pKin, quiet = FALSE) {
-  # Validate inputs with Shadow Broker precision
+  # Validate inputs
   if(!all(c("Indiv", "Sex", "BV", "isCandidate") %in% names(phen))) {
     stop("❌ phen must contain columns: Indiv, Sex, BV, isCandidate")
   }
@@ -23,7 +25,7 @@ custom_candes <- function(phen, pKin, quiet = FALSE) {
   mean_bv <- mean(candidates$BV, na.rm = TRUE)
   var_bv <- var(candidates$BV, na.rm = TRUE)
   
-  # Structure the data as the Shadow Broker would organize her archives
+  # Structure the data
   cand_obj <- list(
     phen = phen,
     candidates = candidates,
@@ -47,7 +49,7 @@ custom_candes <- function(phen, pKin, quiet = FALSE) {
   return(cand_obj)
 }
 
-#' Custom implementation of opticont
+#' Optimise contributions: maximise mean BV at the target mean kinship
 #' @importFrom dplyr mutate select arrange desc
 #' @importFrom magrittr %>%
 #' @importFrom quadprog solve.QP
@@ -62,11 +64,6 @@ custom_opticont <- function(method, cand, con, quiet = FALSE) {
 
   if (target_trait != "BV") {
     stop("❌ Currently only BV optimization is supported")
-  }
-
-  # Check if quadprog is available
-  if (!requireNamespace("quadprog", quietly = TRUE)) {
-    stop("❌ quadprog package is required for OCS fallback. Please install it with: install.packages('quadprog')")
   }
 
   if (!quiet) {
@@ -118,49 +115,6 @@ custom_opticont <- function(method, cand, con, quiet = FALSE) {
       }
     }
     oc
-  }
-
-  if (isTRUE(getOption("allomate.force_qp_greedy", FALSE))) {
-    if (!quiet) {
-      cat("Solver used      : heuristic (quadprog bypassed)\n")
-    }
-    shifted_bv <- bv_vec - min(bv_vec, na.rm = TRUE)
-    oc_raw <- if (all(shifted_bv <= 1e-12)) {
-      rep(1 / n, n)
-    } else {
-      shifted_bv
-    }
-    oc_raw <- oc_raw / sum(oc_raw)
-    oc <- enforce_sex_balance(oc_raw)
-
-    parent_df <- candidates %>%
-      mutate(oc = oc, BV = bv_vec) %>%
-      select(Indiv, Sex, oc, BV)
-
-    mean_kinship_next <- as.numeric(t(oc) %*% K %*% oc)
-
-    if (!quiet) {
-      top_df <- parent_df %>% arrange(desc(oc)) %>% head(5)
-      cat("\n--- OCS Optimization Diagnostics ---\n")
-      cat(sprintf("Solver used      : heuristic (quadprog bypassed)\n"))
-      cat(sprintf("Target kinship   : %.5f\n", target_kinship))
-      cat(sprintf("Achieved kinship : %.5f\n", mean_kinship_next))
-      cat(sprintf("Mean BV          : %.5f\n", sum(oc * bv_vec)))
-      cat("Top contributions:\n")
-      print(top_df)
-      cat("-------------------------------------\n\n")
-    }
-
-    result <- list(
-      parent = parent_df,
-      mean.kin = mean_kinship_next,
-      mean.bv = sum(oc * bv_vec),
-      info = "Heuristic contribution (quadprog bypassed)",
-      solver = "heuristic"
-    )
-
-    class(result) <- "custom_opticont"
-    return(result)
   }
 
   tryCatch({
@@ -264,6 +218,7 @@ custom_opticont <- function(method, cand, con, quiet = FALSE) {
 
 #' Calculate number of offspring from optimum contributions
 #' @importFrom stats xtabs
+#' @importFrom utils head
 #' @param Candidate Data frame with columns Indiv, Sex, oc, optionally BV
 #' @param N Total number of offspring
 #' @return Data frame with Indiv and nOff
@@ -274,7 +229,7 @@ custom_noffspring <- function(Candidate, N) {
 
   has_bv <- "BV" %in% names(Candidate)
 
-  # Target 2N per-parent counts (N male + N female) to mirror optiSel behaviour
+  # Target 2N per-parent counts (N male + N female)
   raw_offspring <- 2 * N * Candidate$oc
 
   males <- Candidate$Sex == "male"
@@ -380,12 +335,6 @@ custom_matings <- function(Candidate, Kin, max_pair_kinship = NULL, quiet = FALS
     }
   }
 
-  platform_tag <- tolower(R.version$platform)
-  force_greedy <- isTRUE(getOption("allomate.force_greedy_mating", FALSE))
-  detected_webr <- grepl("emscripten|wasm", platform_tag)
-  # Always respect the checkbox setting - user choice takes precedence
-  # In webR, the checkbox defaults to TRUE in global.R, but user can uncheck it
-  use_greedy <- force_greedy
   lp_available <- requireNamespace("lpSolve", quietly = TRUE)
 
   announce_algorithm <- function(label) {
@@ -466,16 +415,8 @@ custom_matings <- function(Candidate, Kin, max_pair_kinship = NULL, quiet = FALS
     matings_df
   }
 
-  greedy_label <- if (force_greedy && detected_webr) {
-    "Greedy allocation (user-selected, webR environment)"
-  } else if (force_greedy) {
-    "Greedy allocation (user-selected)"
-  } else {
-    "Greedy allocation (lpSolve unavailable)"
-  }
-
-  if (use_greedy || !lp_available) {
-    return(run_greedy(greedy_label))
+  if (!lp_available) {
+    return(run_greedy("Greedy allocation (lpSolve unavailable)"))
   }
 
   announce_algorithm("lpSolve transportation")
@@ -531,7 +472,8 @@ custom_matings <- function(Candidate, Kin, max_pair_kinship = NULL, quiet = FALS
     return(run_greedy("Greedy allocation (lpSolve failure fallback)"))
   }
 
-  X <- matrix(sol$solution, nrow = length(supply), ncol = length(demand), byrow = TRUE)
+  # lp.transport() already returns the solution as a supply x demand matrix
+  X <- sol$solution
 
   if (!is.null(max_pair_kinship)) {
     used_disallowed <- which(X > 0 & disallowed_mask, arr.ind = TRUE)
@@ -582,70 +524,4 @@ custom_matings <- function(Candidate, Kin, max_pair_kinship = NULL, quiet = FALS
   }
 
   matings_df
-}
-
-#' Main OCS function combining all steps
-#' @importFrom dplyr filter
-#' @importFrom magrittr %>%
-#' 
-#' @param candidates_df Data frame of candidate IDs and sex
-#' @param kinship_matrix Kinship matrix
-#' @param ebv_index Vector of estimated breeding values
-#' @param desired_inbreeding_rate Numeric, upper limit of mean kinship
-#' @param num_offspring Number of offspring to produce
-#' @param per_pair_kinship_limit Optional per-pair kinship threshold
-#' @return List with Candidate and Mating data frames
-run_custom_ocs <- function(candidates_df, kinship_matrix, ebv_index,
-                           desired_inbreeding_rate, num_offspring,
-                           per_pair_kinship_limit = NULL) {
-  
-  # Prepare phenotype data in required format
-  phen <- data.frame(
-    Indiv = candidates_df$id,
-    Sex = ifelse(candidates_df$sex == "M", "male", "female"),
-    BV = ebv_index,
-    isCandidate = TRUE,
-    stringsAsFactors = FALSE
-  )
-  
-  # Ensure kinship matrix has correct dimensions and names
-  candidate_ids <- candidates_df$id
-  sKin <- kinship_matrix[candidate_ids, candidate_ids]
-  rownames(sKin) <- candidate_ids
-  colnames(sKin) <- candidate_ids
-  
-  # Step 1: Create candidate object
-  cand <- custom_candes(phen = phen, pKin = sKin)
-  
-  # Step 2: Run optimization
-  con <- list(ub.pKin = desired_inbreeding_rate)
-  offspring_result <- custom_opticont(method = "max.BV", cand = cand, con = con)
-  
-  # Step 3: Calculate number of offspring
-  Candidate <- offspring_result$parent
-  offspring_counts <- custom_noffspring(Candidate, num_offspring)
-  Candidate$n <- offspring_counts$nOff
-  
-  # Filter candidates with offspring
-  Candidate <- filter(Candidate, n > 0)
-  
-  # Validate we have both sexes
-  if(length(unique(Candidate$Sex)) < 2) {
-    stop("❌ OCS resulted in only one sex being selected. Adjust parameters.")
-  }
-  
-  # Step 4: Mate allocation
-  Mating <- custom_matings(
-    Candidate,
-    Kin = sKin,
-    max_pair_kinship = per_pair_kinship_limit
-  )
-  
-  if (nrow(Mating) == 0) {
-    stop("❌ No feasible mating plan produced. Consider relaxing constraints or reducing offspring targets.")
-  }
-
-  validate_mating_consistency(Candidate, Mating)
-
-  list(Candidate = Candidate, Mating = Mating)
 }

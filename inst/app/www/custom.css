@@ -446,6 +446,48 @@
   color: #495057 !important; 
 }
 
-.card-tools .btn-tool:hover { 
-  color: #212529 !important; 
+.card-tools .btn-tool:hover {
+  color: #212529 !important;
 }
+
+/* ── Maximized results dashboard ── */
+/* Normal view = three standard top-level tabs (Kinship and EBV / OCS / Mate
+   Allocation). When the box is maximized (bs4Dash adds .maximized-card) we drop
+   the sub-tabs and show a single dashboard: the Kinship/EBV quantile summary as a
+   full-width header, with OCS and Mate Allocation side by side beneath it. Keyed
+   on .maximized-card alone so it fires regardless of which tab was active; the
+   non-maximized view is unaffected. .maximized-card only ever applies to the
+   Results box (the sole maximizable box), and every rule is scoped under it. */
+.maximized-card .nav-tabs { display: none !important; }        /* hide sub-tabs */
+.maximized-card .tab-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas:
+    "kin  kin"
+    "ocs  mate";
+  gap: 16px;
+  align-items: start;
+}
+/* reveal + place the quantile header (Kinship pane keeps only its quantile div) */
+.maximized-card .tab-pane[data-value="Kinship and EBV"] {
+  display: block !important;
+  grid-area: kin;
+  height: auto !important;
+  overflow: visible !important;
+}
+/* reveal + place the OCS table (keeps its inline height + independent scroll) */
+.maximized-card .tab-pane[data-value="OCS"] {
+  display: block !important;
+  grid-area: ocs;
+  min-width: 0;
+}
+/* reveal + place the Mate Allocation table (keeps its inline height + scroll) */
+.maximized-card .tab-pane[data-value="Mate Allocation"] {
+  display: block !important;
+  grid-area: mate;
+  min-width: 0;
+}
+/* in the dashboard header, keep only the quantile summary from the Kinship pane */
+.maximized-card .kinship-extra { display: none !important; }
+/* the "maximize me" tip is pointless once maximized */
+.maximized-card .ocs-maximize-tip { display: none !important; }

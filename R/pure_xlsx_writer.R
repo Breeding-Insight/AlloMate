@@ -646,4 +646,38 @@ write_xlsx_pure <- function(file, sheets, creator = "AlloMate") {
   invisible(file)
 }
 
+#' Save a multi-sheet workbook to xlsx, preferring openxlsx with a pure-R fallback
+#'
+#' Writes a single `.xlsx` from a named, ordered list of data frames. Sheets are
+#' written in list order, and the sheet named `active_sheet` (the first sheet by
+#' default) is the one Excel opens on. Uses `openxlsx` when it is installed;
+#' otherwise falls back to the dependency-free [write_xlsx_pure()] (e.g. in
+#' webR/shinylive), where the first sheet is the default-open tab.
+#'
+#' @importFrom openxlsx createWorkbook addWorksheet writeData saveWorkbook
+#' @param file Destination path for the `.xlsx` file.
+#' @param sheets Named list of data frames; names become sheet (tab) names, in order.
+#' @param active_sheet Name of the sheet to open on. Defaults to the first sheet.
+#' @return Invisibly returns `file`.
+save_xlsx_with_fallback <- function(file, sheets, active_sheet = names(sheets)[1]) {
+  if (is.null(names(sheets)) || any(names(sheets) == "")) {
+    stop("All sheets must be named for save_xlsx_with_fallback().")
+  }
+
+  if (requireNamespace("openxlsx", quietly = TRUE)) {
+    wb <- createWorkbook()
+    for (nm in names(sheets)) {
+      addWorksheet(wb, nm)
+      writeData(wb, nm, as.data.frame(sheets[[nm]]))
+    }
+    active_idx <- match(active_sheet, names(sheets))
+    if (!is.na(active_idx)) openxlsx::activeSheet(wb) <- active_idx
+    saveWorkbook(wb, file, overwrite = TRUE)
+  } else {
+    write_xlsx_pure(file, sheets)
+  }
+
+  invisible(file)
+}
+
 
