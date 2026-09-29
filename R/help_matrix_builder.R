@@ -151,7 +151,7 @@ help_content_matrix_builder <- function(collapse_fn = NULL, id_prefix = "") {
         "Matrix Builder outputs relationship-scale matrices (diagonal approx. 1 + F), matching
         AGHmatrix's convention. When uploading a downloaded matrix in Mate Allocation, leave
         “Values are already kinship coefficients” unchecked so it is automatically
-        halved to the kinship scale (approx. 0.5 × (1 + F)) used by optiSel.",
+        halved to the kinship scale (approx. 0.5 × (1 + F)) used by OCS.",
         style = "font-size: 13px; margin: 0;"
       )
     ),

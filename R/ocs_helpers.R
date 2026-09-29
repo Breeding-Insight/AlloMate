@@ -1,10 +1,12 @@
 # OCS (Optimum Contribution Selection) Functions
-# Functions for running OCS analysis with either optiSel or custom fallback
+# Entrypoint and result formatting for the OCS engine in ocs_engine.R
 
-# OCS (Optimum Contribution Selection) Functions
-# Functions for running OCS analysis with either optiSel or custom fallback
-
-#' Run OCS analysis with unified interface
+#' Run OCS analysis
+#'
+#' If the desired inbreeding rate is below the lowest mean kinship the
+#' candidates can reach, the lowest-kinship solution is returned and
+#' `kinship$target_met` is FALSE so the caller can warn the user.
+#'
 #' @param candidates_df Candidates data frame with id, sex, and index_val columns
 #' @param kinship_matrix Kinship matrix for all individuals
 #' @param ebv_index Vector of breeding value indices
@@ -15,19 +17,15 @@
 #' @importFrom dplyr filter
 #' @importFrom magrittr %>%
 #'
-#' @return List with Candidate and Mating results
+#' @return List with Candidate and Mating results, plus `kinship`: a list of
+#'   `target`, `achieved` (mean kinship of the optimal contributions), and
+#'   `target_met`
 run_ocs <- function(candidates_df,
                     kinship_matrix,
                     ebv_index,
                     desired_inbreeding_rate,
                     num_offspring,
                     per_pair_kinship_limit = NULL) {
-  using_optisel <-  requireNamespace("optiSel", quietly = TRUE)
-
-  if (!using_optisel) {
-    stop("❌ OCS functionality is not available. Load optiSel or enable the custom fallback before running OCS.")
-  }
-
   phen <- data.frame(
     Indiv = candidates_df$id,
     Sex = ifelse(candidates_df$sex == "M", "male", "female"),
@@ -40,25 +38,17 @@ run_ocs <- function(candidates_df,
   rownames(sKin) <- candidate_ids
   colnames(sKin) <- candidate_ids
 
-  if (using_optisel) {
-    cand <- optiSel::candes(phen = phen, pKin = sKin)
-    con <- list(ub.pKin = desired_inbreeding_rate)
-    Offspring <- optiSel::opticont(method = "max.BV", cand = cand, con = con)
-  } else {
-    cand <- custom_candes(phen = phen, pKin = sKin)
-    con <- list(ub.pKin = desired_inbreeding_rate)
-    Offspring <- custom_opticont(method = "max.BV", cand = cand, con = con)
-  }
+  cand <- custom_candes(phen = phen, pKin = sKin)
+  con <- list(ub.pKin = desired_inbreeding_rate)
+  Offspring <- custom_opticont(method = "max.BV", cand = cand, con = con)
 
-  if (using_optisel && "summary" %in% names(Offspring)) {
-    # Check if any constraints failed (OK = FALSE)
-    failed_constraints <- Offspring$summary[Offspring$summary$OK == FALSE & !is.na(Offspring$summary$OK), ]
-    if (nrow(failed_constraints) > 0) {
-      constraint_names <- paste(failed_constraints$Name, collapse = ", ")
-      stop(paste("❌ OCS optimization failed: Constraints not met:", constraint_names,
-                 "Try increasing the inbreeding rate threshold or check your kinship matrix."))
-    }
-  }
+  # custom_opticont() returns the closest solution it can reach, so a target
+  # below the candidates' minimum achievable kinship comes back unmet
+  kinship_summary <- list(
+    target     = desired_inbreeding_rate,
+    achieved   = Offspring$mean.kin,
+    target_met = Offspring$mean.kin <= desired_inbreeding_rate + 1e-4
+  )
 
   # Guard against empty or invalid solution (infeasible constraint)
   if (is.null(Offspring$parent) || nrow(Offspring$parent) == 0) {
@@ -91,11 +81,7 @@ run_ocs <- function(candidates_df,
   }
 
   # Safe to call noffspring now that Candidate has valid data
-  Candidate$n <- if (using_optisel) {
-    optiSel::noffspring(Candidate, num_offspring)$nOff
-  } else {
-    custom_noffspring(Candidate, num_offspring)$nOff
-  }
+  Candidate$n <- custom_noffspring(Candidate, num_offspring)$nOff
   Candidate <- filter(Candidate, n > 0)
   if (length(unique(Candidate$Sex)) < 2) {
     stop("❌ OCS resulted in only one sex being selected. Cannot generate mating pairs.")
@@ -104,28 +90,11 @@ run_ocs <- function(candidates_df,
   selected_ids <- Candidate$Indiv
   sKin_subset <- sKin[selected_ids, selected_ids, drop = FALSE]
 
-  should_use_custom_matings <- !is.null(per_pair_kinship_limit) || !using_optisel
-
-  if (!should_use_custom_matings) {
-    Mating <- optiSel::matings(Candidate, Kin = sKin_subset)
-    if (nrow(Mating) > 0 && !"Kin" %in% names(Mating)) {
-      Mating$Kin <- vapply(
-        seq_len(nrow(Mating)),
-        function(i) {
-          sire <- Mating$Sire[i]
-          dam <- Mating$Dam[i]
-          sKin_subset[sire, dam]
-        },
-        numeric(1)
-      )
-    }
-  } else {
-    Mating <- custom_matings(
-      Candidate,
-      Kin = sKin_subset,
-      max_pair_kinship = per_pair_kinship_limit
-    )
-  }
+  Mating <- custom_matings(
+    Candidate,
+    Kin = sKin_subset,
+    max_pair_kinship = per_pair_kinship_limit
+  )
 
   if (nrow(Mating) == 0) {
     stop("❌ No feasible mating plan could be generated under the chosen settings. Try increasing the per-pair kinship limit or adjusting offspring counts.")
@@ -133,7 +102,7 @@ run_ocs <- function(candidates_df,
 
   validate_mating_consistency(Candidate, Mating)
 
-  list(Candidate = Candidate, Mating = Mating)
+  list(Candidate = Candidate, Mating = Mating, kinship = kinship_summary)
 }
 
 
@@ -293,7 +262,7 @@ format_ocs_results <- function(results) {
   # Format mating table - handle different column naming schemes
   mating_df <- results$Mating
 
-  # Check and standardize column names (optiSel vs custom implementation)
+  # Standardize column names for display
   if ("Sire" %in% names(mating_df)) {
     mating_df <- mating_df %>% rename(Male = Sire)
   }
@@ -355,7 +324,10 @@ format_ocs_results <- function(results) {
     mating_info = {
       info <- attr(results$Mating, "info")
       if (is.null(info)) NA_character_ else info
-    }
+    },
+    target_kinship   = if (is.null(results$kinship)) NA_real_ else results$kinship$target,
+    achieved_kinship = if (is.null(results$kinship)) NA_real_ else results$kinship$achieved,
+    kinship_target_met = if (is.null(results$kinship)) NA else results$kinship$target_met
   )
 
   list(
@@ -363,12 +335,6 @@ format_ocs_results <- function(results) {
     mating_table = mating_table,
     summary_stats = summary_stats
   )
-}
-
-#' Reset OCS runtime state (fallback only)
-#' @return Invisibly returns FALSE
-reset_ocs_runtime <- function() {
-  invisible(FALSE)
 }
 
 #' Create Excel workbook with OCS results
@@ -394,7 +360,7 @@ create_ocs_workbook <- function(results, params = NULL, kinship_threshold = NULL
       c(
         paste("- Target inbreeding rate:", params$inbreeding_rate),
         paste("- Number of offspring:", params$num_offspring),
-        paste("- Implementation:", if (!requireNamespace("optiSel", quietly = TRUE)) "Custom fallback" else "optiSel")
+        "- Implementation: quadprog (contributions) + lpSolve (mate allocation)"
       )
     } else {
       "Parameters not recorded"

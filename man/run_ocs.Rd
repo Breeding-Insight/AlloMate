@@ -2,7 +2,7 @@
 % Please edit documentation in R/ocs_helpers.R
 \name{run_ocs}
 \alias{run_ocs}
-\title{Run OCS analysis with unified interface}
+\title{Run OCS analysis}
 \usage{
 run_ocs(
   candidates_df,
@@ -27,8 +27,12 @@ run_ocs(
 \item{per_pair_kinship_limit}{Optional maximum kinship allowed for any mating pair}
 }
 \value{
-List with Candidate and Mating results
+List with Candidate and Mating results, plus `kinship`: a list of
+  `target`, `achieved` (mean kinship of the optimal contributions), and
+  `target_met`
 }
 \description{
-Run OCS analysis with unified interface
+If the desired inbreeding rate is below the lowest mean kinship the
+candidates can reach, the lowest-kinship solution is returned and
+`kinship$target_met` is FALSE so the caller can warn the user.
 }

@@ -265,7 +265,9 @@ help_content_allomate <- function(collapse_fn = NULL, id_prefix = "") {
       body_content = shiny::p(
         "The target rate of inbreeding per generation used by the OCS optimiser. Lower
         values preserve more genetic diversity but may reduce short-term genetic gain.
-        Typical values range from 0.01 to 0.05. Must be greater than 0.",
+        Typical values range from 0.01 to 0.05. Must be greater than 0. If the rate is
+        below the lowest mean kinship your candidates can reach, AlloMate returns the
+        lowest-kinship plan and shows a warning with the kinship actually achieved.",
         style = "font-size: 13px; margin: 0;"
       )
     ),
@@ -281,29 +283,14 @@ help_content_allomate <- function(collapse_fn = NULL, id_prefix = "") {
       )
     ),
     collapse_fn(
-      panel_id     = pid("am_help_greedy"),  # <-- prefixed
+      panel_id     = pid("am_help_pair_kinship"),  # <-- prefixed
       icon_name    = "gear",
-      label        = "Advanced OCS Options (optiSel required)",
-      body_content = shiny::tagList(
-        shiny::p(shiny::HTML("These options are only shown when the <code>optiSel</code> package is available:"),
-                 style = "font-size: 13px; margin-bottom: 6px;"),
-        shiny::tags$ul(
-          style = "font-size: 13px;",
-          shiny::tags$li(shiny::HTML(
-            "<strong>Enforce per-pair kinship threshold</strong> — filters the mating plan
-            so that no allocated pair exceeds the desired inbreeding rate."
-          )),
-          shiny::tags$li(shiny::HTML(
-            "<strong>Use greedy mating (browser-safe)</strong> — replaces the LP-based
-            mating allocator with a greedy heuristic. Use this if the app freezes during
-            large mating plan generation."
-          )),
-          shiny::tags$li(shiny::HTML(
-            "<strong>Bypass quadprog (heuristic contributions)</strong> — skips the
-            quadratic programming solver for contribution optimisation and uses a fast
-            heuristic instead."
-          ))
-        )
+      label        = "Enforce Per-Pair Kinship Threshold (OCS)",
+      body_content = shiny::p(
+        "When checked (the default), the mating plan only pairs mates whose kinship is
+        below the desired inbreeding rate. If no plan can satisfy this, OCS stops with an
+        error; raise the inbreeding rate or uncheck the box to allow closer pairings.",
+        style = "font-size: 13px; margin: 0;"
       )
     ),
 

@@ -116,8 +116,6 @@ mod_allomate_ui <- function(id) {
             "Configure breeding objectives and constraints:",
             style = "color: #6c757d; font-size: 12px; margin-bottom: 10px;"
           ),
-          shiny::verbatimTextOutput(ns("package_status_text")),
-          shiny::div(style = "display:none;", shiny::textOutput(ns("ocs_checkbox_mode"))),
           shiny::h6("Breeding Objectives"),
           shiny::numericInput(
             ns("inbreeding_rate"), "Desired Inbreeding Rate",
@@ -135,23 +133,10 @@ mod_allomate_ui <- function(id) {
             "For replicable results: leave blank for a different result each run, or set a number to get the same OCS/mating plan every time for the same inputs.",
             style = "color: #6c757d; font-size: 11px; margin-top: -8px; margin-bottom: 8px;"
           ),
-          shiny::conditionalPanel(
-            condition = sprintf("output['%s'] == '1'", ns("ocs_checkbox_mode")),
-            shiny::checkboxInput(
-              ns("enforce_pair_kinship"),
-              "Enforce per-pair kinship threshold in mating plan",
-              value = TRUE
-            ),
-            shiny::checkboxInput(
-              ns("force_greedy_mating"),
-              "Use greedy mating (browser-safe)",
-              value = isTRUE(getOption("allomate.force_greedy_mating", FALSE))
-            ),
-            shiny::checkboxInput(
-              ns("force_qp_greedy"),
-              "Bypass quadprog (heuristic contributions)",
-              value = isTRUE(getOption("allomate.force_qp_greedy", FALSE))
-            )
+          shiny::checkboxInput(
+            ns("enforce_pair_kinship"),
+            "Enforce per-pair kinship threshold in mating plan",
+            value = TRUE
           ),
           shiny::actionButton(ns("run_ocs_btn"), "Run OCS"),
           shiny::hr(),
@@ -353,18 +338,6 @@ mod_allomate_server <- function(id, parent_session) {
     pedigree_validation_stats <- shiny::reactiveVal(NULL)
     ebv_data <- shiny::reactive({ process_ebvs(trait_counter(), input) })
 
-    #### Package status ####
-    output$package_status_text <- shiny::renderText({ generate_package_status() })
-    optisel_available      <- requireNamespace("optiSel", quietly = TRUE)
-    ocs_checkboxes_enabled <- optisel_available
-    output$ocs_checkbox_mode <- shiny::renderText({
-      if (ocs_checkboxes_enabled) "1" else ""
-    })
-    shiny::outputOptions(output, "ocs_checkbox_mode", suspendWhenHidden = FALSE)
-    if (optisel_available) {
-      options(allomate.force_greedy_mating = FALSE, allomate.force_qp_greedy = FALSE)
-    }
-    
     #### Candidates ####
     candidates_data <- shiny::reactive({
       shiny::req(input$candidate_file)
@@ -766,10 +739,14 @@ mod_allomate_server <- function(id, parent_session) {
         }
 
         # Parameters
+        achieved_kinship <- ocs_results_reactive()$kinship$achieved
         write.table(
           data.frame(
-            Parameter = c("Analysis Date", "Kinship Threshold", "Desired Inbreeding Rate", "Number of Offspring", "Random Seed"),
-            Value     = c(as.character(Sys.Date()), input$thresh, input$inbreeding_rate, input$num_offspring,
+            Parameter = c("Analysis Date", "Kinship Threshold", "Desired Inbreeding Rate", "Achieved Mean Kinship (OCS)",
+                          "Number of Offspring", "Random Seed"),
+            Value     = c(as.character(Sys.Date()), input$thresh, input$inbreeding_rate,
+                          if (is.null(achieved_kinship)) "Not run" else round(achieved_kinship, 4),
+                          input$num_offspring,
                           if (!is.null(input$ocs_seed) && !is.na(input$ocs_seed)) input$ocs_seed else "Not set (random)")
           ),
           file.path(tmp_dir, "Parameters.tsv"), sep = "\t", row.names = FALSE, quote = FALSE
@@ -787,16 +764,6 @@ mod_allomate_server <- function(id, parent_session) {
     })
     
     #### OCS server logic ####
-    shiny::observeEvent(input$force_greedy_mating, {
-      if (!ocs_checkboxes_enabled) return(NULL)
-      options(allomate.force_greedy_mating = isTRUE(input$force_greedy_mating))
-    }, ignoreNULL = FALSE)
-    
-    shiny::observeEvent(input$force_qp_greedy, {
-      if (!ocs_checkboxes_enabled) return(NULL)
-      options(allomate.force_qp_greedy = isTRUE(input$force_qp_greedy))
-    }, ignoreNULL = FALSE)
-    
     shiny::observeEvent(input$run_ocs_btn, {
       shiny::req(input$candidate_file)
       matrix_source_now <- input$matrix_source %||% "pedigree"
@@ -812,12 +779,6 @@ mod_allomate_server <- function(id, parent_session) {
         bs4Dash::updateBox("instructions_box", action = "toggle", session = session)
       shinyjs::disable("download_mate_allocation")
       shinyjs::disable("download_all_tsv")
-      if (ocs_checkboxes_enabled) {
-        options(allomate.force_greedy_mating = isTRUE(input$force_greedy_mating))
-        options(allomate.force_qp_greedy     = isTRUE(input$force_qp_greedy))
-      } else {
-        options(allomate.force_greedy_mating = FALSE, allomate.force_qp_greedy = FALSE)
-      }
       shinyjs::show("ocs_loading")
       on.exit(shinyjs::hide("ocs_loading"), add = TRUE)
       shinyWidgets::updateProgressBar(
@@ -885,14 +846,22 @@ mod_allomate_server <- function(id, parent_session) {
           ebv_index               = candidates_filtered$index_val,
           desired_inbreeding_rate = input$inbreeding_rate,
           num_offspring           = input$num_offspring,
-          per_pair_kinship_limit  = if (ocs_checkboxes_enabled && isTRUE(input$enforce_pair_kinship))
+          per_pair_kinship_limit  = if (isTRUE(input$enforce_pair_kinship))
             input$inbreeding_rate else NULL
         )
+        if (!isTRUE(results$kinship$target_met)) {
+          shiny::showNotification(
+            sprintf(paste0("OCS: the desired inbreeding rate (%.3f) cannot be reached with these candidates. ",
+                           "Showing the lowest-kinship plan instead (mean kinship %.4f)."),
+                    results$kinship$target, results$kinship$achieved),
+            type = "warning", duration = 12
+          )
+        }
         mating_info <- attr(results$Mating, "info")
         if (!is.null(mating_info) && is.character(mating_info) &&
             grepl("Greedy allocation", mating_info, fixed = TRUE)) {
           shiny::showNotification(
-            paste0("OCS fallback: ", mating_info,
+            paste0("Mate allocation: ", mating_info,
                    ". lpSolve solution could not be used, so a greedy mating plan was generated."),
             type = "warning", duration = 10
           )
@@ -929,7 +898,7 @@ mod_allomate_server <- function(id, parent_session) {
       shiny::req(ocs_results_reactive())
       formatted_results <- format_ocs_results(ocs_results_reactive())
       mating_tbl <- formatted_results$mating_table
-      if (ocs_checkboxes_enabled && isTRUE(input$enforce_pair_kinship)) {
+      if (isTRUE(input$enforce_pair_kinship)) {
         mating_tbl <- mating_tbl %>%
           dplyr::filter(is.na(Kinship) | Kinship < input$inbreeding_rate)
       }
@@ -938,11 +907,19 @@ mod_allomate_server <- function(id, parent_session) {
     
     output$ocs_solver_note <- shiny::renderUI({
       shiny::req(ocs_results_reactive())
-      info <- format_ocs_results(ocs_results_reactive())$summary_stats$mating_info
-      if (is.null(info) || is.na(info) || info == "") return(NULL)
+      stats <- format_ocs_results(ocs_results_reactive())$summary_stats
+      info  <- stats$mating_info
+      notes <- c(
+        if (!is.null(info) && !is.na(info) && info != "") info,
+        if (isFALSE(stats$kinship_target_met))
+          sprintf("Desired inbreeding rate %.3f is below the lowest mean kinship these candidates can reach; showing the lowest-kinship plan (mean kinship %.4f).",
+                  stats$target_kinship, stats$achieved_kinship)
+      )
+      if (length(notes) == 0) return(NULL)
       shiny::div(
         style = "margin: 10px 0; padding: 10px; background-color: #fff8e1; border-left: 4px solid #ffb300; font-size: 13px;",
-        shiny::tags$strong("Solver note: "), info
+        shiny::tags$strong("Solver note: "),
+        do.call(shiny::tagList, lapply(notes, shiny::tags$div))
       )
     })
 

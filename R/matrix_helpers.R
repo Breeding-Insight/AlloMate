@@ -55,7 +55,7 @@ read_relationship_matrix_upload <- function(file) {
 
 #' Convert a relationship matrix to a kinship matrix
 #'
-#' optiSel::candes()/opticont() expect kinship coefficients (diagonal
+#' run_ocs() expects kinship coefficients (diagonal
 #' approx. 0.5 * (1 + F)), the same convention produced by kinship2::kinship().
 #' A/G/H matrices built by AGHmatrix are on the relationship scale (diagonal
 #' approx. 1 + F) and must be halved before use.
@@ -63,7 +63,7 @@ read_relationship_matrix_upload <- function(file) {
 #' @param mat Relationship or kinship matrix
 #' @param already_kinship If TRUE, mat is returned unchanged. If FALSE (default),
 #'   mat is treated as a relationship matrix and divided by 2.
-#' @return kinship matrix suitable for run_ocs()/optiSel::candes(pKin = ...)
+#' @return kinship matrix suitable for run_ocs()
 matrix_to_kinship <- function(mat, already_kinship = FALSE) {
   if (isTRUE(already_kinship)) mat else mat / 2
 }

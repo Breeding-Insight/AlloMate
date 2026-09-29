@@ -33,20 +33,6 @@ create_ocs_trait_inputs <- function(n, ns = function(id) id) {
   })
 }
 
-#' Generate package status text
-#' @importFrom utils head
-#' @return Formatted status text for display
-generate_package_status <- function() {
-  optisel_flag <- requireNamespace("optiSel", quietly = TRUE)
-  # maybe add the kinship2 check later if needed
-  if (optisel_flag) {
-    status_text <- "Optimum Contribution Selection: Ready\n Current solver: Optisel"
-    } else { 
-      status_text <- "Optimum Contribution Selection: Ready\n Current solver: quadprog fallback"  
-      }
-  status_text
-}
-
 #' Check if WebR is detected
 #' @return TRUE if WebR environment detected
 is_webr_environment <- function() {

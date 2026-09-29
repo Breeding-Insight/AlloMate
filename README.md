@@ -51,9 +51,8 @@ of breeding program designs.
 ### Technical Highlights
 
 - Implemented in R and Shiny
-- Uses the optiSel package when available
-- Includes a pure-R OCS fallback implementation for environments where optiSel
-  cannot be installed
+- OCS solved in pure R: quadprog optimises contributions and lpSolve allocates
+  matings (with a greedy backup if the LP solution cannot be used)
 - Designed for modularity and extensibility
 - Exportable results for downstream analysis and reporting
 
@@ -87,12 +86,12 @@ Key R packages used by AlloMate include:
 - tidyr
 - kinship2
 - quadprog
+- lpSolve
 - DT
 - openxlsx
 
 Optional:
 
-- optiSel (used when available for Optimum Contribution Selection)
 - AGHmatrix (used by the Matrix Builder to compute A/G/H relationship matrices)
 
 ---

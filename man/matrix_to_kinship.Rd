@@ -13,10 +13,10 @@ matrix_to_kinship(mat, already_kinship = FALSE)
 mat is treated as a relationship matrix and divided by 2.}
 }
 \value{
-kinship matrix suitable for run_ocs()/optiSel::candes(pKin = ...)
+kinship matrix suitable for run_ocs()
 }
 \description{
-optiSel::candes()/opticont() expect kinship coefficients (diagonal
+run_ocs() expects kinship coefficients (diagonal
 approx. 0.5 * (1 + F)), the same convention produced by kinship2::kinship().
 A/G/H matrices built by AGHmatrix are on the relationship scale (diagonal
 approx. 1 + F) and must be halved before use.
