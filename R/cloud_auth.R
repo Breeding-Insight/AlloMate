@@ -65,6 +65,23 @@ constant_time_equal <- function(a, b) {
   all(xor(a, b) == as.raw(0))
 }
 
+#' Base64url without padding or line breaks
+#'
+#' Cookie values must not contain line breaks: Cloud Run rejects a response
+#' whose Set-Cookie header has one ("upstream ... protocol error"), and
+#' jsonlite::base64url_enc() wraps long values every 76 characters.
+#' @noRd
+base64url_encode <- function(text) {
+  encoded <- openssl::base64_encode(charToRaw(text), linebreaks = FALSE)
+  sub("=+$", "", chartr("+/", "-_", encoded))
+}
+
+base64url_decode <- function(value) {
+  value <- chartr("-_", "+/", value)
+  value <- paste0(value, strrep("=", (4 - nchar(value) %% 4) %% 4))
+  rawToChar(openssl::base64_decode(value))
+}
+
 auth_sign <- function(payload, key) {
   as.character(openssl::sha256(payload, key = key))
 }
@@ -73,10 +90,10 @@ auth_sign <- function(payload, key) {
 #' @noRd
 encode_session <- function(orcid_id, name, key, now = Sys.time()) {
   body <- jsonlite::toJSON(
-    list(orcid = orcid_id, name = name, exp = as.numeric(now) + auth_session_seconds()),
+    list(orcid = orcid_id, name = name, exp = round(as.numeric(now) + auth_session_seconds())),
     auto_unbox = TRUE
   )
-  payload <- jsonlite::base64url_enc(as.character(body))
+  payload <- base64url_encode(as.character(body))
   paste0(payload, ".", auth_sign(payload, key))
 }
 
@@ -88,7 +105,7 @@ decode_session <- function(value, key, now = Sys.time()) {
   if (length(parts) != 2) return(NULL)
   if (!constant_time_equal(auth_sign(parts[1], key), parts[2])) return(NULL)
   body <- tryCatch(
-    jsonlite::fromJSON(rawToChar(jsonlite::base64url_dec(parts[1]))),
+    jsonlite::fromJSON(base64url_decode(parts[1])),
     error = function(e) NULL
   )
   if (is.null(body) || is.null(body$exp) || as.numeric(now) > body$exp) return(NULL)

@@ -10,7 +10,7 @@ shinyapps.io deployment are unchanged: everything below is switched on only by t
 | Area | Behaviour | Code |
 |---|---|---|
 | Sign-in | ORCID sign-in; only ORCID iDs with `users/{orcid_id}.is_active: true` in Firestore get in. Signed-out visitors to `/` go to the landing page. | `R/cloud_auth.R`, `R/cloud_routes.R` |
-| Routes | `/health` (204, no sign-in), `/robots.txt` (disallow all), `/auth/login`, `/auth/callback`, `/auth/logout` | `R/cloud_routes.R` |
+| Routes | `/health` (200, no sign-in), `/robots.txt` (disallow all), `/auth/login`, `/auth/callback`, `/auth/logout` | `R/cloud_routes.R` |
 | Idle sessions | Warning after 8 minutes without activity, disconnect after 10 | `R/cloud_session.R`, `inst/app/www/cloud.js` |
 | Uploads | Limit raised from Shiny's 5 MB to 30 MiB; uploaded files deleted when the session ends | `R/run_app.R`, `R/cloud_session.R` |
 | Navbar | Signed-in name and a Sign out link | `R/cloud_session.R` |

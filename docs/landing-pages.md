@@ -19,7 +19,8 @@ script; keep it the same in both repositories.
 
 1. **Minimum instances `0`**, with startup CPU boost enabled.
 2. **A quick, unauthenticated health path** that returns immediately without touching a
-   database or session. AlloMate uses `GET /health` (returns `204`).
+   database or session. AlloMate uses `GET /health` (returns `200`; Cloud Run rejects a 204 that carries a
+   `Content-Length` header, which Shiny's web server always sends).
    Do not use a path ending in `z` such as `/healthz`: Cloud Run reserves those paths and
    never forwards them to the container.
 3. **A `robots.txt` that disallows everything:**

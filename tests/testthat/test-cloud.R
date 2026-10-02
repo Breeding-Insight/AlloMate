@@ -52,10 +52,20 @@ test_that("session cookies round-trip and reject tampering and expiry", {
   })
 })
 
+test_that("session cookies for long names have no line breaks", {
+  with_cloud_env({
+    value <- AlloMate:::encode_session("0000-0002-4762-3518", strrep("Long Display Name ", 6),
+                                       Sys.getenv("SECRET_KEY"))
+    # Cloud Run rejects a Set-Cookie header containing a line break or space.
+    expect_match(value, "^[A-Za-z0-9_-]+\\.[0-9a-f]{64}$")
+    expect_equal(AlloMate:::decode_session(value, Sys.getenv("SECRET_KEY"))$orcid, "0000-0002-4762-3518")
+  })
+})
+
 test_that("health and robots.txt answer without sign-in", {
   with_cloud_env({
     health <- AlloMate:::cloud_route_request(fake_request("/health"))
-    expect_equal(health$status, 204L)
+    expect_equal(health$status, 200L)
     robots <- AlloMate:::cloud_route_request(fake_request("/robots.txt"))
     expect_equal(robots$status, 200L)
     expect_match(robots$content, "Disallow: /", fixed = TRUE)

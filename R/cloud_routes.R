@@ -10,9 +10,11 @@ cloud_route_request <- function(req) {
   path <- req$PATH_INFO %||% "/"
 
   # Quick and unauthenticated, for the landing page's wake-up request.
-  # Not /healthz: Cloud Run reserves paths ending in "z".
+  # Not /healthz: Cloud Run reserves paths ending in "z". 200 rather than 204:
+  # httpuv adds Content-Length to every response, and Cloud Run rejects a 204
+  # that has one.
   if (identical(path, "/health")) {
-    return(shiny::httpResponse(204, content_type = "text/plain", content = "",
+    return(shiny::httpResponse(200, content_type = "text/plain", content = "ok",
                                headers = list(`Cache-Control` = "no-store")))
   }
   # The public landing page lives on GitHub Pages; keep crawlers off the service.
