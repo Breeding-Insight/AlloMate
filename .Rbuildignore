@@ -2,3 +2,7 @@
 ^\.Rproj\.user$
 ^\.positai$
 ^\.claude$
+^Dockerfile$
+^\.dockerignore$
+^landing$
+^\.github$

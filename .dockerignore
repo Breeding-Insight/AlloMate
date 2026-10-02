@@ -1,0 +1,30 @@
+# Keep the Cloud Run image small: only what the installed package needs.
+.git
+.github
+.Rproj.user
+.vscode
+.claude
+.positai
+*.Rproj
+.Rhistory
+.RData
+.Ruserdata
+**/.DS_Store
+Dockerfile
+.dockerignore
+
+# Not used by the running app
+landing
+docs
+dev
+man
+tests
+rsconnect
+manuscript
+troubleshoot*
+CLAUDE.md
+inst/scripts
+inst/data/original_USDA_data
+
+# Shinylive (webR) export for GitHub Pages: about 120 MB
+inst/app/docs
