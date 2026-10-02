@@ -32,4 +32,13 @@
   events.forEach(function (name) {
     window.addEventListener(name, report, { capture: true, passive: true });
   });
+
+  // Leaving the page on purpose (Sign out, reload, closing the tab) closes the
+  // Shiny connection, which would flash the "session has ended" message just
+  // before the page goes. Hide it once the page starts unloading.
+  window.addEventListener("beforeunload", function () {
+    var style = document.createElement("style");
+    style.textContent = "#ss-connect-dialog, #ss-overlay { display: none !important; }";
+    document.head.appendChild(style);
+  });
 })();
