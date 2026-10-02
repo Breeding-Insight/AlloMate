@@ -68,16 +68,27 @@ Attach it as the Cloud Run service identity. Do not create a JSON key.
 
 ## 3. ORCID
 
-Register a production ORCID application for AlloMate (separate from HapApp's) with the
-redirect URI:
+ORCID allows one set of public API credentials per ORCID account, so AlloMate shares the
+ORCID application already registered for HapApp. In that account's ORCID Developer Tools:
 
-```text
-https://allomate-510101458052.us-west1.run.app/auth/callback
-```
+- **Add a redirect URI** for AlloMate, keeping HapApp's:
 
-That is the service URL if the service is named `allomate` in HapApp's project
-(project number 510101458052) and region; adjust if either differs. For testing against
-ORCID's sandbox, set `ORCID_BASE_URL=https://sandbox.orcid.org`.
+  ```text
+  https://allomate-510101458052.us-west1.run.app/auth/callback
+  ```
+
+  That is the service URL if the service is named `allomate` in HapApp's project
+  (project number 510101458052) and region; adjust if either differs.
+- **Name the application for both apps**, e.g. "Breeding Insight apps", with application URL
+  `https://breedinginsight.org/open-source-software-solutions/`. People see the name and URL
+  on ORCID's sign-in screen. Changing them does not change the client ID or secret, so
+  HapApp keeps working.
+
+Copy the shared client ID and secret into AlloMate's own secrets (step 4), so AlloMate can
+move to its own ORCID application later without touching HapApp. Access stays separate:
+AlloMate checks its own Firestore approved list after sign-in.
+
+For testing against ORCID's sandbox, set `ORCID_BASE_URL=https://sandbox.orcid.org`.
 
 ## 4. Secrets and environment
 
@@ -86,8 +97,8 @@ Secret Manager secrets, exposed as environment variables:
 | Variable | Secret |
 |---|---|
 | `SECRET_KEY` | A random value of at least 32 characters, e.g. `openssl rand -hex 32` |
-| `ORCID_CLIENT_ID` | From the ORCID application |
-| `ORCID_CLIENT_SECRET` | From the ORCID application |
+| `ORCID_CLIENT_ID` | From the shared ORCID application (same value as HapApp's) |
+| `ORCID_CLIENT_SECRET` | From the shared ORCID application (same value as HapApp's) |
 
 Plain environment variables:
 
