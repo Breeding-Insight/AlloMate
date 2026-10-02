@@ -238,11 +238,13 @@ auth_callback <- function(req) {
       cookies = clear_state))
   }
   if (!isTRUE(approved)) {
+    landing <- cloud_env("ALLOMATE_LANDING_URL")
     return(auth_message_page(403, "Access not approved yet",
       sprintf("The ORCID iD %s is not approved to use AlloMate. To request access, email %s with your ORCID iD.",
               token$orcid, AUTH_CONTACT_EMAIL),
-      action_href = cloud_env("ALLOMATE_LANDING_URL", "/auth/login"),
-      action_label = "Back to AlloMate", cookies = clear_state))
+      action_href = if (nzchar(landing)) landing else "/auth/login",
+      action_label = if (nzchar(landing)) "Back to the AlloMate home page" else "Try signing in again",
+      cookies = clear_state))
   }
 
   session_value <- encode_session(token$orcid, token$name %||% "", Sys.getenv("SECRET_KEY"))
@@ -330,8 +332,20 @@ firestore_user_is_active <- function(orcid_id) {
   req <- httr2::req_error(req, is_error = function(resp) FALSE)
   resp <- httr2::req_perform(req)
   status <- httr2::resp_status(resp)
-  if (status == 404) return(FALSE)
+  if (status == 404) {
+    # Firestore says whether the document or the whole database is missing.
+    detail <- tryCatch(httr2::resp_body_json(resp)$error$message, error = function(e) NULL)
+    message("AlloMate sign-in: not approved, Firestore 404 for ", url, ": ", detail %||% "no detail")
+    return(FALSE)
+  }
   if (status != 200) stop("Firestore returned HTTP ", status)
   fields <- httr2::resp_body_json(resp)$fields
-  isTRUE(fields$is_active$booleanValue)
+  active <- fields$is_active
+  if (!isTRUE(active$booleanValue)) {
+    message("AlloMate sign-in: not approved, users/", orcid_id, " has is_active = ",
+            if (is.null(active)) "missing" else jsonlite::toJSON(active, auto_unbox = TRUE),
+            " (needs boolean true)")
+    return(FALSE)
+  }
+  TRUE
 }
