@@ -11,9 +11,14 @@ dev:
   golem_wd: !expr golem::pkg_path()
 
 # Google Cloud Run deployment (set R_CONFIG_ACTIVE=cloudrun on the service).
-# Turns on ORCID sign-in and the /health and /robots.txt routes. Secrets and
-# URLs come from environment variables; see docs/cloud-run.md.
+# Turns on ORCID sign-in, the idle disconnect, the larger upload limit and the
+# /health and /robots.txt routes. Secrets and URLs come from environment
+# variables; see docs/cloud-run.md.
 cloudrun:
   app_prod: yes
   cloud_run: yes
+  # Cloud Run rejects HTTP/1 requests over 32 MiB, so stay just under it.
+  max_upload_mb: 30
+  idle_warn_minutes: 8
+  idle_close_minutes: 10
   session_hours: 12

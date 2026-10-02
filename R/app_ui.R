@@ -104,7 +104,7 @@ app_ui <- function(request) {
       ),
       bs4Dash::dashboardBody(
         shinyjs::useShinyjs(),
-        shinydisconnect::disconnectMessage(),
+        if (cloud) cloud_disconnect_message() else shinydisconnect::disconnectMessage(),
         tags$style(
           HTML(
             ".main-footer {

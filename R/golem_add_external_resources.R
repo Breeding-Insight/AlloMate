@@ -36,6 +36,9 @@ golem_add_external_resources <- function() {
 
     # Custom JavaScript
     tags$script(src = sprintf("www/custom.js?v=%s", www_mtime("custom.js"))),
+
+    # Cloud Run only: activity reports for the idle disconnect
+    if (cloud_mode()) tags$script(src = sprintf("www/cloud.js?v=%s", www_mtime("cloud.js"))),
     
     # Any other head tags
     tags$meta(name = "viewport", content = "width=device-width, initial-scale=1")

@@ -16,6 +16,8 @@ run_app <- function(
 ) {
   if (cloud_mode()) {
     cloud_preflight()
+    # Shiny's default limit is 5 MB; Cloud Run rejects requests over 32 MiB.
+    options(shiny.maxRequestSize = as.numeric(cloud_setting("max_upload_mb", 30)) * 1024^2)
     # Let app_ui() answer the health check, robots.txt and sign-in routes
     # (see cloud_route_request()). shinyApp() anchors this with ^...$.
     uiPattern <- "(/|/health|/robots\\.txt|/auth/login|/auth/callback|/auth/logout)"
