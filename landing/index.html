@@ -10,7 +10,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="AlloMate combines pedigree or genomic relationships with weighted EBVs and Optimum Contribution Selection to plan matings that balance genetic gain against inbreeding.">
+    <meta name="description" content="AlloMate is a code-free web app for selection indices, Optimum Contribution Selection and mate allocation, helping breeders balance genetic gain against inbreeding.">
     <title>AlloMate | Breeding Insight</title>
     <link rel="icon" type="image/png" href="assets/allomate-icon.png">
     <style>
@@ -271,9 +271,10 @@
             <span class="eyebrow">Breeding Insight mate allocation</span>
             <h1 id="hero-title">Plan matings that balance genetic gain against inbreeding</h1>
             <p class="lead">
-              AlloMate combines pedigree or genomic relationships with weighted estimated breeding values (EBVs)
-              and Optimum Contribution Selection (OCS) to recommend how much each candidate should contribute
-              to the next generation and which pairs to mate.
+              AlloMate puts selection index theory and Optimum Contribution Selection (OCS) behind a code-free
+              interface. It combines your pedigree or genomic relationships with weighted estimated breeding
+              values (EBVs) to recommend how much each candidate should contribute to the next generation and
+              which pairs to mate.
             </p>
             <div class="hero-actions">
               <a class="btn btn-primary" href="https://allomate-510101458052.us-west1.run.app/auth/login" data-launch>
@@ -306,6 +307,10 @@
               kinship at the rate of inbreeding you choose, so you can make steady progress without losing the
               diversity future selection depends on.
             </p>
+            <p>
+              These methods are well proven, but applying them has usually meant writing code. AlloMate removes
+              that barrier, so any breeding program can use them, whatever its computational expertise.
+            </p>
           </div>
         </div>
       </section>
@@ -316,7 +321,8 @@
             <h2 id="how-title">How AlloMate works</h2>
             <p>
               AlloMate runs online, with no software to install and no command line. Upload your
-              files, choose your breeding objectives, and download a mating plan.
+              files, choose your breeding objectives, and download a mating plan. Your data is not
+              retained: files are used only during your session and deleted when it ends.
             </p>
           </div>
           <ol class="steps">
@@ -331,18 +337,20 @@
             </li>
             <li>
               <strong>Breeding values.</strong>
-              Upload an EBV file for each trait and give each trait a weight. AlloMate combines them into a
-              single selection index.
+              Upload an EBV file for each trait and weight the traits to match your breeding objectives.
+              AlloMate builds a selection index, projects the expected merit of progeny from every potential
+              cross, and uses your kinship threshold to rule out crosses between close relatives.
             </li>
             <li>
               <strong>Optimum Contribution Selection.</strong>
-              Set the desired rate of inbreeding and the number of offspring. AlloMate finds each candidate&rsquo;s
-              optimal contribution and allocates matings, optionally keeping every pair below a kinship limit.
+              Set the desired rate of inbreeding and the number of offspring. AlloMate optimizes each candidate&rsquo;s
+              contribution to maximize genetic gain while holding inbreeding to your target and maintaining
+              genetic diversity, then allocates matings, optionally keeping every pair below a kinship limit.
             </li>
             <li>
               <strong>Download your results.</strong>
-              You receive the mating plan, candidate contributions and kinship results as an Excel workbook,
-              or every table as tab-separated files.
+              You receive the mating plan, optimum contributions and kinship results as an Excel workbook, or
+              every table as tab-separated files with a record of the parameters you used.
             </li>
           </ol>
         </div>
@@ -362,20 +370,7 @@
         </div>
       </section>
 
-      <section class="band alt" id="data" aria-labelledby="data-title">
-        <div class="wrap">
-          <div class="section-head" style="margin-bottom:0">
-            <h2 id="data-title">What happens to your data</h2>
-            <p>
-              Your files are used only during your session and are deleted when it ends. AlloMate does not keep
-              copies of your data or results, so download everything you need before you leave. Sessions close
-              after 10 minutes without activity.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section class="band" id="tools" aria-labelledby="tools-title">
+      <section class="band alt" id="tools" aria-labelledby="tools-title">
         <div class="wrap">
           <div class="section-head">
             <h2 id="tools-title">More Breeding Insight tools</h2>
@@ -387,24 +382,10 @@
           <div class="grid grid-3">
             <article class="card tool-card" aria-labelledby="tool-1">
               <div class="tool-head">
-                <img class="tool-logo" src="assets/tools/hapapp.png" alt="" loading="lazy">
-                <div>
-                  <span class="tool-tag">Microhaplotypes</span>
-                  <h3 id="tool-1">HapApp</h3>
-                </div>
-              </div>
-              <p>Processes DArTag MADC reports against Breeding Insight&rsquo;s public microhaplotype databases and assigns fixed allele IDs ready for downstream analysis.</p>
-              <div class="tool-links">
-                <a href="https://breeding-insight.github.io/HapApp-online/"><svg aria-hidden="true" focusable="false"><use href="#icon-globe"/></svg>Website<span class="visually-hidden"> for HapApp</span></a>
-                <a href="https://github.com/Breeding-Insight/HapApp-online"><svg aria-hidden="true" focusable="false"><use href="#icon-github"/></svg>GitHub<span class="visually-hidden"> repository for HapApp</span></a>
-              </div>
-            </article>
-            <article class="card tool-card" aria-labelledby="tool-2">
-              <div class="tool-head">
                 <img class="tool-logo" src="assets/tools/bigapp.png" alt="" loading="lazy">
                 <div>
                   <span class="tool-tag">Genomic analysis</span>
-                  <h3 id="tool-2">BIGapp</h3>
+                  <h3 id="tool-1">BIGapp</h3>
                 </div>
               </div>
               <p>A user-friendly Shiny app for genotype calling from read counts, population structure, GWAS, and genomic selection in diploid and polyploid species.</p>
@@ -413,12 +394,12 @@
                 <a href="https://github.com/Breeding-Insight/BIGapp"><svg aria-hidden="true" focusable="false"><use href="#icon-github"/></svg>GitHub<span class="visually-hidden"> repository for BIGapp</span></a>
               </div>
             </article>
-            <article class="card tool-card" aria-labelledby="tool-3">
+            <article class="card tool-card" aria-labelledby="tool-2">
               <div class="tool-head">
                 <img class="tool-logo" src="assets/tools/qploidy2.png" alt="" loading="lazy">
                 <div>
                   <span class="tool-tag">Ploidy and CNV</span>
-                  <h3 id="tool-3">Qploidy2</h3>
+                  <h3 id="tool-2">Qploidy2</h3>
                 </div>
               </div>
               <p>Estimates ploidy, aneuploidy, and large-scale copy number variation from genetic marker data.</p>
@@ -427,12 +408,12 @@
                 <a href="https://github.com/Breeding-Insight/Qploidy2"><svg aria-hidden="true" focusable="false"><use href="#icon-github"/></svg>GitHub<span class="visually-hidden"> repository for Qploidy2</span></a>
               </div>
             </article>
-            <article class="card tool-card" aria-labelledby="tool-4">
+            <article class="card tool-card" aria-labelledby="tool-3">
               <div class="tool-head">
                 <img class="tool-logo" src="assets/tools/bigr.png" alt="" loading="lazy">
                 <div>
                   <span class="tool-tag">R package</span>
-                  <h3 id="tool-4">BIGr</h3>
+                  <h3 id="tool-3">BIGr</h3>
                 </div>
               </div>
               <p>Functions developed by Breeding Insight to analyze diploid and polyploid breeding and genetic data.</p>
@@ -441,17 +422,31 @@
                 <a href="https://github.com/Breeding-Insight/BIGr"><svg aria-hidden="true" focusable="false"><use href="#icon-github"/></svg>GitHub<span class="visually-hidden"> repository for BIGr</span></a>
               </div>
             </article>
-            <article class="card tool-card" aria-labelledby="tool-5">
+            <article class="card tool-card" aria-labelledby="tool-4">
               <div class="tool-head">
                 <img class="tool-logo" src="assets/tools/genobrew.png" alt="" loading="lazy">
                 <div>
                   <span class="tool-tag">Panel evaluation</span>
-                  <h3 id="tool-5">GenoBrew</h3>
+                  <h3 id="tool-4">GenoBrew</h3>
                 </div>
               </div>
               <p>A Shiny app for evaluating marker panel efficiency and visualizing copy number variation profiles.</p>
               <div class="tool-links">
                 <a href="https://github.com/Breeding-Insight/GenoBrew"><svg aria-hidden="true" focusable="false"><use href="#icon-github"/></svg>GitHub<span class="visually-hidden"> repository for GenoBrew</span></a>
+              </div>
+            </article>
+            <article class="card tool-card" aria-labelledby="tool-5">
+              <div class="tool-head">
+                <img class="tool-logo" src="assets/tools/hapapp.png" alt="" loading="lazy">
+                <div>
+                  <span class="tool-tag">Microhaplotypes</span>
+                  <h3 id="tool-5">HapApp</h3>
+                </div>
+              </div>
+              <p>Processes DArTag MADC reports against Breeding Insight&rsquo;s public microhaplotype databases and assigns fixed allele IDs ready for downstream analysis.</p>
+              <div class="tool-links">
+                <a href="https://breeding-insight.github.io/HapApp-online/"><svg aria-hidden="true" focusable="false"><use href="#icon-globe"/></svg>Website<span class="visually-hidden"> for HapApp</span></a>
+                <a href="https://github.com/Breeding-Insight/HapApp-online"><svg aria-hidden="true" focusable="false"><use href="#icon-github"/></svg>GitHub<span class="visually-hidden"> repository for HapApp</span></a>
               </div>
             </article>
             <article class="card tool-card" aria-labelledby="tool-6">
