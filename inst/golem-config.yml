@@ -2,6 +2,7 @@ default:
   golem_name: AlloMate
   golem_version: 0.0.0.9000
   app_prod: no
+  cloud_run: no
 
 production:
   app_prod: yes
@@ -9,3 +10,10 @@ production:
 dev:
   golem_wd: !expr golem::pkg_path()
 
+# Google Cloud Run deployment (set R_CONFIG_ACTIVE=cloudrun on the service).
+# Turns on ORCID sign-in and the /health and /robots.txt routes. Secrets and
+# URLs come from environment variables; see docs/cloud-run.md.
+cloudrun:
+  app_prod: yes
+  cloud_run: yes
+  session_hours: 12

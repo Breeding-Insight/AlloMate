@@ -5,6 +5,12 @@
 #'
 #' @noRd
 app_ui <- function(request) {
+  cloud <- cloud_mode()
+  if (cloud) {
+    # Health check, robots.txt, sign-in routes, and the signed-out redirect.
+    routed <- cloud_route_request(request)
+    if (!is.null(routed)) return(routed)
+  }
   tagList(
     # Leave this function for adding external resources
     golem_add_external_resources(),
@@ -29,7 +35,8 @@ app_ui <- function(request) {
             style  = "margin-right: 8px;"
           ),
           shiny::span("AlloMate")
-        )
+        ),
+        rightUi = if (cloud) cloud_navbar_items(request)
       ),
       help = NULL,
       bs4Dash::bs4DashSidebar(

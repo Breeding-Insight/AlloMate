@@ -14,6 +14,12 @@ run_app <- function(
   uiPattern = "/",
   ...
 ) {
+  if (cloud_mode()) {
+    cloud_preflight()
+    # Let app_ui() answer the health check, robots.txt and sign-in routes
+    # (see cloud_route_request()). shinyApp() anchors this with ^...$.
+    uiPattern <- "(/|/health|/robots\\.txt|/auth/login|/auth/callback|/auth/logout)"
+  }
   with_golem_options(
     app = shinyApp(
       ui = app_ui,
