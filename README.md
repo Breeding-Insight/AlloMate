@@ -75,6 +75,13 @@ remotes::install_github("Breeding-Insight/AlloMate")
 ```r
 AlloMate::run_app()
 ```
+
+### Online version (Google Cloud Run)
+
+AlloMate is also deployed on Google Cloud Run with ORCID sign-in, from the same code.
+The Cloud Run features (sign-in, idle disconnect, larger upload limit) are switched on
+only by the `cloudrun` config profile, so running the app locally or on shinyapps.io is
+unaffected. See [docs/cloud-run.md](docs/cloud-run.md).
 ---
 
 ## Dependencies
